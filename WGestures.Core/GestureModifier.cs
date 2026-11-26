@@ -19,7 +19,7 @@ namespace WGestures.Core
         X2 = 64,
 
         Scroll = WheelBackward | WheelForward,
-        All = WheelForward | WheelBackward | MiddleButtonDown | LeftButtonDown | RightButtonDown
+        All = WheelForward | WheelBackward | MiddleButtonDown | LeftButtonDown | RightButtonDown | X1 | X2
     }
 
     public static class GestureModifierHelper

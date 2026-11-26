@@ -1,0 +1,61 @@
+name: Modern engine CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/Engine/**'
+      - 'src/WGestures.Modern*/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
+      - 'tests/**'
+      - '.github/workflows/engine-ci.yml'
+  push:
+    branches: [feat/modern-settings-shell]
+    paths:
+      - 'src/Engine/**'
+      - 'src/WGestures.Modern.Core/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
+      - 'tests/**'
+      - '.github/workflows/engine-ci.yml'
+
+concurrency:
+  group: modern-engine-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build engine and all linked legacy modules
+        run: dotnet build src/Engine/Nyxic.Gestures.Engine/Nyxic.Gestures.Engine.csproj -c Release -p:Platform=x64
+      - name: Check configuration contract
+        run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj -c Release
+      - name: Replay engine behavior with synthetic input
+        run: dotnet run --project tests/WGestures.Engine.Checks/WGestures.Engine.Checks.csproj -c Release
+      - name: Validate bundled actions without activating hooks
+        shell: pwsh
+        run: |
+          $engine = Get-ChildItem src/Engine/Nyxic.Gestures.Engine/bin -Recurse -Filter Nyxic.Gestures.Engine.exe | Select-Object -First 1
+          if (-not $engine) { throw 'Missing engine executable' }
+          $fixture = (Resolve-Path WGestures.App/defaults/gestures.wg2).Path
+          $settings = Join-Path $env:RUNNER_TEMP 'engine-settings.json'
+          '{"AllowScripts":true}' | Set-Content $settings
+          $p = Start-Process $engine.FullName -ArgumentList @('--validate', ('"' + $fixture + '"'), ('"' + $settings + '"')) -PassThru -Wait
+          if ($p.ExitCode -ne 0) {
+            $log = Join-Path $env:LOCALAPPDATA 'Nyxic-Lab\Gestures\engine-status.log'
+            if (Test-Path $log) { Get-Content $log }
+            throw "Engine validation failed: $($p.ExitCode)"
+          }

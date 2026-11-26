@@ -1,0 +1,140 @@
+name: Modern Windows CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/WGestures.Modern*/**'
+      - 'tests/WGestures.Modern.Core.Checks/**'
+      - 'tests/WGestures.Engine.Checks/**'
+      - 'WGestures.App/defaults/gestures.wg2'
+      - '.github/workflows/modern-ci.yml'
+      - 'installer/**'
+      - 'src/Engine/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
+  push:
+    branches: [feat/modern-settings-shell]
+    paths:
+      - 'src/WGestures.Modern*/**'
+      - 'tests/WGestures.Modern.Core.Checks/**'
+      - 'tests/WGestures.Engine.Checks/**'
+      - 'WGestures.App/defaults/gestures.wg2'
+      - '.github/workflows/modern-ci.yml'
+      - 'installer/**'
+      - 'src/Engine/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
+  workflow_dispatch:
+
+concurrency:
+  group: modern-windows-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Validate packaging script syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $script = (Resolve-Path ./installer/Build-Release.ps1).Path
+          $null = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host $_.ToString() }
+            throw 'Packaging script syntax validation failed.'
+          }
+          Write-Host 'PASS PowerShell packaging script syntax'
+      - name: Run configuration regression checks
+        run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj --configuration Release
+      - name: Replay engine behavior with synthetic input
+        run: dotnet run --project tests/WGestures.Engine.Checks/WGestures.Engine.Checks.csproj -c Release
+      - name: Compile native WPF settings application
+        run: dotnet build src/WGestures.Modern/WGestures.Modern.csproj -c Release -p:Platform=x64
+
+      - name: Exercise WPF dropdown before packaging
+        if: github.event_name != 'push'
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem src/WGestures.Modern/bin/x64/Release -Recurse -Filter WGestures.Modern.exe | Select-Object -First 1
+          if (-not $app) { throw 'Built WPF executable not found.' }
+          $diag = Join-Path $PWD 'artifacts\prepackage-ui'
+          New-Item -ItemType Directory -Path $diag -Force | Out-Null
+          foreach ($mode in @('--smoke-ui', '--smoke-ui-compat')) {
+            $log = Join-Path $diag ($mode.TrimStart('-') + '.log')
+            $p = Start-Process $app.FullName -ArgumentList @($mode, ('"' + $log + '"')) -WorkingDirectory $app.DirectoryName -PassThru
+            try {
+              if (-not $p.WaitForExit(45000)) { throw "Prepackage UI timed out: $mode" }
+              if (Test-Path $log) { Get-Content $log }
+              if ($p.ExitCode -ne 0) { throw "Prepackage UI failed: $mode ($($p.ExitCode))" }
+              if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'PASS shared WPF dropdown template: popup opened, items rendered, selection applied, popup closed' -Quiet)) {
+                throw "Missing prepackage dropdown evidence: $mode"
+              }
+            } finally {
+              if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+            }
+          }
+      - name: Ensure Inno Setup is installed
+        if: github.event_name != 'push'
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $compiler)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          }
+      - name: Package and smoke-test Windows release candidate
+        if: github.event_name != 'push'
+        shell: pwsh
+        run: ./installer/Build-Release.ps1
+      - name: Upload Windows installer
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NyxicGestures-0.1.0-rc.4-win-x64-Setup
+          path: artifacts/release/*-Setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload portable package, source and checksums
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NyxicGestures-0.1.0-rc.4-portable-and-source
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload real WPF visual evidence
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NyxicGestures-0.1.0-rc.4-ui-evidence
+          path: artifacts/release/ui-evidence/**/*.png
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload WPF smoke diagnostics
+        if: always() && github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: RC4-ui-diagnostics
+          path: |
+            artifacts/prepackage-ui/**
+            artifacts/release/ui-diagnostics/**
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>Nyxic.Gestures.Engine</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64;ARM64</Platforms>
+    <Platform Condition="'$(Platform)' == 'AnyCPU'">x64</Platform>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../WGestures.Modern.Core/WGestures.Modern.Core.csproj"/>
+    <ProjectReference Include="../WGestures.Core/WGestures.Core.csproj"/>
+    <ProjectReference Include="../WGestures.View/WGestures.View.csproj"/>
+  </ItemGroup>
+</Project>

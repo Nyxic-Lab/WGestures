@@ -274,9 +274,12 @@ namespace WGestures.Core.Impl.Windows
         public event Action<ScreenCorner> HotCornerTriggered;
         public event Action<ScreenEdge> EdgeRubbed;
         
+        public event Action HookReady;
+
         public void Start()
         {
             _mouseKbdHook.Install();
+            HookReady?.Invoke();
             //Touch Only Support Win8+
             //if (OSVersion.Major >= 6 && OSVersion.Minor > 1) _touchHook.Install();
             
@@ -286,7 +289,7 @@ namespace WGestures.Core.Impl.Windows
                 MSG msg;
                 lock(_msgQueue)
                 {
-                    if(_msgQueue.Count == 0) Monitor.Wait(_msgQueue);
+                    while (_msgQueue.Count == 0) Monitor.Wait(_msgQueue);
                     msg = _msgQueue.Dequeue();
                     UpdateContextAndEventArgs();
                 }

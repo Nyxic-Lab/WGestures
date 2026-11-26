@@ -67,6 +67,7 @@ namespace WGestures.Core
         public event Action IntentOrPathCanceled;
         public event Action<GestureModifier> IntentReadyToExecuteOnModifier;
         public event Action<string,GestureIntent> CommandReportStatus;
+        public event Action<string, Exception> CommandFailed;
 
         public event Action<Gesture> GestureCaptured
         {
@@ -94,6 +95,9 @@ namespace WGestures.Core
         private Point _lastPoint;
         private int _pointCount = 0;
         private GestureIntent _effectiveIntent;
+        private IGestureModifiersAware _activeModifierCommand;
+        private bool _pathActive;
+        private bool _modifierFailed;
         private ExeApp _currentApp;
 
         private bool _isPaused;
@@ -109,6 +113,7 @@ namespace WGestures.Core
             PathTracker.BeforePathStart += PathTrackerOnBeforePathStart;
             PathTracker.PathStart += PathTrackerOnPathStart;
             PathTracker.PathEnd += PathTrackerOnPathEnd;
+            PathTracker.PathTimeout += PathTrackerOnPathTimeout;
             PathTracker.EffectivePathGrow += PathTrackerOnEffectivePathGrow;
             PathTracker.PathModifier += PathTrackerOnPathModifier;
             PathTracker.HotCornerTriggered += PathTracker_HotCornerTriggered;
@@ -186,7 +191,7 @@ namespace WGestures.Core
                             dir = Get8DirectionDir(vector);
                             if (dir != last)
                             {
-                                if (GetAngle(new Point(_firstStrokeEndPoint.X - args.Context.StartPoint.X, _firstStrokeEndPoint.Y - args.Context.StartPoint.X),
+                                if (GetAngle(new Point(_firstStrokeEndPoint.X - args.Context.StartPoint.X, _firstStrokeEndPoint.Y - args.Context.StartPoint.Y),
                                     new Point(args.Location.X - _firstStrokeEndPoint.X, args.Location.Y - _firstStrokeEndPoint.Y)) < 36f)
                                 {
                                     dir = last;
@@ -257,7 +262,7 @@ namespace WGestures.Core
         //Stopwatch sw = new Stopwatch();
         private void PathTrackerOnEffectivePathGrow(PathEventArgs args)
         {
-            if (_gesture.Count() >= MaxGestureSteps) return;
+            if (!_pathActive || _modifierFailed || _gesture.Count() >= MaxGestureSteps) return;
 
             var gestureChanged = Parse(args);
 
@@ -292,6 +297,8 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathEnd(PathEventArgs args)
         {
+            if (!_pathActive) return;
+            _pathActive = false;
             if (IsInCaptureMode)
             {
                 OnGestureCaptured(_gesture);
@@ -308,22 +315,15 @@ namespace WGestures.Core
             //所以不执行而直接结束
             if (_effectiveIntent.CanExecuteOnModifier())
             {
-                var modifierStateAwareCmd = _effectiveIntent.Command as IGestureModifiersAware;
-                if (modifierStateAwareCmd != null)
-                {
-                    modifierStateAwareCmd.GestureEnded();
-                    modifierStateAwareCmd.ReportStatus -= OnCommandReportStatus;
-                }
-
-                //发布事件
+                var modifierResult = EndModifierSession();
                 OnIntentReadyToExecute(_effectiveIntent);
-                if (IntentExecuted != null) IntentExecuted(_effectiveIntent, null);
+                if (IntentExecuted != null) IntentExecuted(_effectiveIntent, modifierResult);
                 return;
             }
 
 
             OnIntentReadyToExecute(_effectiveIntent);
-            var result = _effectiveIntent.Execute(args.Context, this);
+            var result = ExecuteIntent(_effectiveIntent, args.Context);
 
             //发布事件
             if (IntentExecuted != null) IntentExecuted(_effectiveIntent, result);
@@ -331,6 +331,9 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathStart(PathEventArgs args)
         {
+            EndModifierSession();
+            _pathActive = true;
+            _modifierFailed = false;
             //初始化
             _effectiveIntent = null;
             _pointCount = 1;
@@ -340,6 +343,7 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathModifier(PathEventArgs args)
         {
+            if (!_pathActive || _modifierFailed) return;
             Debug.WriteLineIf(_gesture.Modifier != args.Modifier,"Gesture:" + _gesture);
 
             _gesture.Modifier = args.Modifier;
@@ -352,10 +356,16 @@ namespace WGestures.Core
             //如果当前被“捕获”了，则把修饰符事件发送给命令。
             if (_effectiveIntent != null)
             {
-                var modifierStateAwareCommand = _effectiveIntent.Command as IGestureModifiersAware;
-                if (PathTracker.IsSuspended && modifierStateAwareCommand != null)
+                if (PathTracker.IsSuspended && _activeModifierCommand != null)
                 {
-                    modifierStateAwareCommand.ModifierTriggered(args.Modifier);
+                    try { _activeModifierCommand.ModifierTriggered(args.Modifier); }
+                    catch (Exception ex)
+                    {
+                        ReportFailure(_effectiveIntent.Name, ex);
+                        EndModifierSession();
+                        _modifierFailed = true;
+                        _effectiveIntent = null;
+                    }
                     return;
                 }
 
@@ -380,18 +390,22 @@ namespace WGestures.Core
                     //todo: 这个逻辑似乎应该放在GestureIntent中
                     if (modifierStateAwareCommand != null)
                     {
-                        var shouldInit = modifierStateAwareCommand as INeedInit;
-                        if (shouldInit != null && !shouldInit.IsInitialized)
+                        try
                         {
-                            shouldInit.Init();
+                            _effectiveIntent.PrepareCommand(args.Context, this);
+                            _activeModifierCommand = modifierStateAwareCommand;
+                            modifierStateAwareCommand.ReportStatus += OnCommandReportStatus;
+                            GestureModifier observedModifiers;
+                            modifierStateAwareCommand.GestureRecognized(out observedModifiers);
+                            PathTracker.SuspendTemprarily(filteredModifiers: GestureModifier.All & ~observedModifiers);
                         }
-
-                        modifierStateAwareCommand.ReportStatus += OnCommandReportStatus;
-                        GestureModifier observedModifiers;
-                        modifierStateAwareCommand.GestureRecognized(out observedModifiers);
-
-                        //要观察的modifier事件与PathTracker需要排除的恰好相反
-                        PathTracker.SuspendTemprarily(filteredModifiers: GestureModifier.All &~ observedModifiers);
+                        catch (Exception ex)
+                        {
+                            ReportFailure(_effectiveIntent.Name, ex);
+                            EndModifierSession();
+                            _modifierFailed = true;
+                        _effectiveIntent = null;
+                        }
                     }
                     else
                     {
@@ -399,7 +413,9 @@ namespace WGestures.Core
                         PathTracker.SuspendTemprarily(filteredModifiers: GestureModifier.None);//GestureModifier.All &~ args.Modifier);
 
                         //todo：在这里发布一个事件应该是合理的
-                        _effectiveIntent.Execute(args.Context, this);
+                        var execution = ExecuteIntent(_effectiveIntent, args.Context);
+                        if (IntentExecuted != null) IntentExecuted(_effectiveIntent, execution);
+                        if (!execution.IsOk) { _modifierFailed = true; _effectiveIntent = null; }
                     }
 
                 }
@@ -418,15 +434,7 @@ namespace WGestures.Core
             Debug.WriteLine("HotCorner: " + corner);
 
             var cmd = IntentFinder.IntentStore.HotCornerCommands[(int)corner];
-            if(cmd != null)
-            {
-                var shouldInit = cmd as INeedInit;
-                if (shouldInit != null && !shouldInit.IsInitialized)
-                {
-                    shouldInit.Init();
-                }
-                cmd.Execute();
-            }
+            ExecuteAuxiliary(cmd, "Hot corner " + corner);
         }
 
         private void PathTracker_EdgeRubbed(ScreenEdge edge)
@@ -438,15 +446,54 @@ namespace WGestures.Core
             // corners & edges 的command 依次存放在一个8元素数组中。
             // 4 + edge == 实际对应的cmd
             var cmd = IntentFinder.IntentStore.HotCornerCommands[4 + (int)edge];
-            if (cmd != null)
+            ExecuteAuxiliary(cmd, "Screen edge " + edge);
+        }
+
+        private GestureIntent.ExecutionResult ExecuteIntent(GestureIntent intent, GestureContext context)
+        {
+            var result = intent.Execute(context, this);
+            if (!result.IsOk) ReportFailure(intent.Name, result.Exception);
+            return result;
+        }
+
+        private void ExecuteAuxiliary(AbstractCommand command, string name)
+        {
+            if (command == null) return;
+            // Preserve the historical lack of automatic target-window activation.
+            // Supplying a reliable auxiliary target is a separate compatibility decision.
+            var intent = new GestureIntent { Name = name, Command = command };
+            ExecuteIntent(intent, null);
+        }
+
+        private void ReportFailure(string name, Exception error)
+        {
+            Debug.WriteLine(name + ": " + error);
+            CommandFailed?.Invoke(name, error);
+        }
+
+        private GestureIntent.ExecutionResult EndModifierSession()
+        {
+            var command = _activeModifierCommand;
+            _activeModifierCommand = null;
+            if (command == null) return new GestureIntent.ExecutionResult(null, true);
+            try
             {
-                var shouldInit = cmd as INeedInit;
-                if (shouldInit != null && !shouldInit.IsInitialized)
-                {
-                    shouldInit.Init();
-                }
-                cmd.Execute();
+                command.GestureEnded();
+                return new GestureIntent.ExecutionResult(null, true);
             }
+            catch (Exception ex)
+            {
+                ReportFailure(_effectiveIntent?.Name ?? "Modifier gesture", ex);
+                return new GestureIntent.ExecutionResult(ex, false);
+            }
+            finally { command.ReportStatus -= OnCommandReportStatus; }
+        }
+
+        private void PathTrackerOnPathTimeout(PathEventArgs args)
+        {
+            _pathActive = false;
+            EndModifierSession();
+            _effectiveIntent = null;
         }
 
         #endregion
@@ -579,6 +626,7 @@ namespace WGestures.Core
             float productValue = (va_x * vb_x) + (va_y * vb_y);  // 向量的乘积
             float va_val = (float)Math.Sqrt(va_x * va_x + va_y * va_y);  // 向量a的模
             float vb_val = (float)Math.Sqrt(vb_x * vb_x + vb_y * vb_y);  // 向量b的模
+            if (va_val == 0 || vb_val == 0) return 0;
             float cosValue = productValue / (va_val * vb_val);      // 余弦公式
 
             // acos的输入参数范围必须在[-1, 1]之间，否则会"domain error"
@@ -609,14 +657,17 @@ namespace WGestures.Core
 
         public void Dispose()
         {
+            EndModifierSession();
             if (PathTracker != null)
             {
                 PathTracker.BeforePathStart -= PathTrackerOnBeforePathStart;
                 PathTracker.PathStart -= PathTrackerOnPathStart;
                 PathTracker.PathEnd -= PathTrackerOnPathEnd;
+                PathTracker.PathTimeout -= PathTrackerOnPathTimeout;
                 PathTracker.EffectivePathGrow -= PathTrackerOnEffectivePathGrow;
                 PathTracker.PathModifier -= PathTrackerOnPathModifier;
                 PathTracker.HotCornerTriggered -= PathTracker_HotCornerTriggered;
+                PathTracker.EdgeRubbed -= PathTracker_EdgeRubbed;
             }
         }
     }
