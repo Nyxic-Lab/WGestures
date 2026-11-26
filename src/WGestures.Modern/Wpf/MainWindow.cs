@@ -441,13 +441,14 @@ internal sealed partial class MainWindow : Window
                 Button("Local diagnostics", OpenDiagnostics))));
     }
 
-    internal void RunSmokeChecks(string evidenceDirectory)
+    internal async Task RunSmokeChecksAsync(string evidenceDirectory)
     {
         if (_workspace is null || _workspace.Profiles.Sum(p => p.Gestures.Count) != 66)
             throw new InvalidOperationException("Bundled configuration missing or invalid.");
         foreach (var page in Pages)
         {
-            Navigate(page.Id); UpdateLayout();
+            Navigate(page.Id);
+            await SettleUiAsync();
             if (_page.Children.Count == 0) throw new InvalidOperationException("Empty page: " + page.Id);
             Program.Log("PASS WPF page: " + page.Id);
             CapturePage(evidenceDirectory, "light-" + page.Id);
@@ -459,21 +460,71 @@ internal sealed partial class MainWindow : Window
         }
         var draftEditor = BuildGestureForm(null);
         if (draftEditor.View.Children.Count == 0) throw new InvalidOperationException("Gesture editor is empty.");
-        Theme.Apply("Dark"); Navigate("gestures"); UpdateLayout();
+        Theme.Apply("Dark"); Navigate("gestures");
+        await SettleUiAsync();
         CapturePage(evidenceDirectory, "dark-gestures");
-        // Exercise the actual non-editable popup, not only the ComboBox data model.
+
+        // WPF coerces IsDropDownOpen to false until Loaded, then opens after
+        // rendering on the dispatcher. UpdateLayout alone cannot drain that work.
         var combo = FindVisual<ComboBox>(_page) ?? throw new InvalidOperationException("Gesture profile control is missing.");
         combo.ApplyTemplate();
-        if (combo.Template.FindName("PART_Popup", combo) is not System.Windows.Controls.Primitives.Popup)
+        combo.BringIntoView();
+        Activate();
+        combo.Focus();
+        await SettleUiAsync();
+        if (!combo.IsLoaded || !combo.IsVisible || PresentationSource.FromVisual(combo) == null)
+            throw new InvalidOperationException("Profile dropdown was not loaded into the displayed window.");
+        if (combo.Template.FindName("PART_Popup", combo) is not System.Windows.Controls.Primitives.Popup popup)
             throw new InvalidOperationException("Shared ComboBox popup template is missing.");
-        combo.IsDropDownOpen = true; UpdateLayout();
-        if (!combo.IsDropDownOpen) throw new InvalidOperationException("Profile dropdown did not open.");
-        combo.IsDropDownOpen = false;
-        Program.Log("PASS shared WPF dropdown template");
-        Navigate("settings"); UpdateLayout(); CapturePage(evidenceDirectory, "dark-settings");
-        Theme.Apply("Light"); Navigate("overview"); UpdateLayout();
+        bool opened = false, closed = false;
+        EventHandler onOpened = (_, _) => opened = true;
+        EventHandler onClosed = (_, _) => closed = true;
+        combo.DropDownOpened += onOpened;
+        combo.DropDownClosed += onClosed;
+        int originalIndex = combo.SelectedIndex;
+        try
+        {
+            if (combo.Items.Count < 2) throw new InvalidOperationException("Profile dropdown has no alternate option.");
+            Program.Log($"Profile dropdown preflight: loaded={combo.IsLoaded}, visible={combo.IsVisible}, items={combo.Items.Count}, focused={combo.IsKeyboardFocusWithin}");
+            combo.SetCurrentValue(ComboBox.IsDropDownOpenProperty, true);
+            await SettleUiAsync();
+            if (!combo.IsDropDownOpen || !popup.IsOpen || !opened)
+                throw new InvalidOperationException($"Profile dropdown did not open: combo={combo.IsDropDownOpen}, popup={popup.IsOpen}, event={opened}, loaded={combo.IsLoaded}.");
+            // A visible popup must actually host selectable item containers.
+            int alternate = (originalIndex + 1) % combo.Items.Count;
+            if (combo.ItemContainerGenerator.ContainerFromIndex(alternate) is not ComboBoxItem item ||
+                !item.IsLoaded || !item.IsVisible || PresentationSource.FromVisual(item) == null)
+                throw new InvalidOperationException("Profile dropdown did not render its selectable items.");
+            item.SetCurrentValue(ComboBoxItem.IsSelectedProperty, true);
+            await SettleUiAsync();
+            if (combo.SelectedIndex != alternate || !Equals(combo.SelectedValue, _profile))
+                throw new InvalidOperationException("Profile dropdown selection did not update the gesture library.");
+            combo.SetCurrentValue(ComboBox.IsDropDownOpenProperty, false);
+            await SettleUiAsync();
+            if (combo.IsDropDownOpen || popup.IsOpen || !closed)
+                throw new InvalidOperationException("Profile dropdown did not close correctly.");
+            Program.Log("PASS shared WPF dropdown template: popup opened, items rendered, selection applied, popup closed");
+        }
+        finally
+        {
+            combo.DropDownOpened -= onOpened;
+            combo.DropDownClosed -= onClosed;
+            combo.SetCurrentValue(ComboBox.IsDropDownOpenProperty, false);
+            combo.SelectedIndex = originalIndex;
+        }
+        Navigate("settings");
+        await SettleUiAsync();
+        CapturePage(evidenceDirectory, "dark-settings");
+        Theme.Apply("Light"); Navigate("overview");
+        await SettleUiAsync();
         Theme.Apply("System");
     }
+    private async Task SettleUiAsync()
+    {
+        UpdateLayout();
+        await Dispatcher.InvokeAsync(() => { UpdateLayout(); }, DispatcherPriority.ContextIdle);
+    }
+
     private static T? FindVisual<T>(DependencyObject element) where T : DependencyObject
     {
         if (element is T match) return match;

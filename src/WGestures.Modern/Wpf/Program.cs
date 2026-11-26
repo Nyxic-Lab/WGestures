@@ -54,13 +54,13 @@ internal static class Program
             if (smoke)
             {
                 var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-                timer.Tick += (_, _) =>
+                timer.Tick += async (_, _) =>
                 {
                     timer.Stop();
                     try
                     {
                         string evidence = Path.Combine(Path.GetDirectoryName(_log)!, Path.GetFileNameWithoutExtension(_log) + "-screens");
-                        window.RunSmokeChecks(evidence);
+                        await window.RunSmokeChecksAsync(evidence);
                         if (forceCompatibility)
                         {
                             if (!Theme.IsClassic) throw new InvalidOperationException("Compatibility mode was not selected.");

@@ -171,6 +171,9 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
                         }
                         if (Test-Path $uiSmokeLog) { Get-Content $uiSmokeLog }
                         if ($smoke.ExitCode -ne 0) { throw "WPF smoke test failed: $uiMode ($($smoke.ExitCode))" }
+                        if (-not (Test-Path $uiSmokeLog) -or -not (Select-String -Path $uiSmokeLog -Pattern 'PASS shared WPF dropdown template: popup opened, items rendered, selection applied, popup closed' -Quiet)) {
+                            throw "Missing dropdown interaction evidence: $uiMode"
+                        }
                         if (-not (Test-Path $uiSmokeLog) -or -not (Select-String -Path $uiSmokeLog -Pattern 'PASS WPF window, six pages, theme and twelve action editors' -Quiet)) {
                             throw "WPF smoke test did not reach the full UI pass marker: $uiMode"
                         }
@@ -188,6 +191,12 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
                     }
                     finally {
                         if (-not $smoke.HasExited) { Stop-Process -Id $smoke.Id -Force }
+                        # Keep diagnostic evidence even when the smoke test rejects the package.
+                        $diag = Join-Path $output ('ui-diagnostics\' + $uiMode.TrimStart('-'))
+                        New-Item -ItemType Directory -Path $diag -Force | Out-Null
+                        if (Test-Path $uiSmokeLog) { Copy-Item $uiSmokeLog $diag -Force }
+                        $partialScreens = Join-Path $stage (([IO.Path]::GetFileNameWithoutExtension($uiSmokeLog)) + '-screens')
+                        if (Test-Path $partialScreens) { Copy-Item $partialScreens $diag -Recurse -Force }
                     }
                 }
 
