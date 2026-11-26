@@ -1,6 +1,10 @@
 using System.Text.Json.Nodes;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.Foundation;
 using WGestures.Modern.Core;
 
 namespace WGestures.Modern;
@@ -21,10 +25,12 @@ public sealed partial class MainWindow
         var known = CommandCatalog.Definitions.ToList().FindIndex(d => d.Id == id);
         if (known < 0) fields.Children.Add(Paragraph("Unsupported imported command. Select a known action to replace it."));
         var readers = new Dictionary<string, Func<JsonNode?>>();
+        var keyFields = new Dictionary<string, TextBox>();
         void RenderFields(JsonObject raw)
         {
             fields.Children.Clear();
             readers.Clear();
+            keyFields.Clear();
             if (kind.SelectedItem is not ComboBoxItem { Tag: string type }) return;
             var def = CommandCatalog.Find(type)!;
             if (type is "Script" or "Cmd")
@@ -78,8 +84,32 @@ public sealed partial class MainWindow
                         return field.Kind == "nullable" && string.IsNullOrWhiteSpace(text.Text) ? null : JsonValue.Create(text.Text);
                     };
                     fields.Children.Add(text);
+                    if (field.Kind == "keys") keyFields[field.Key] = text;
                 }
                 if (field.Help is not null) fields.Children.Add(Paragraph(field.Help));
+            }
+            if (type == "HotKey" && keyFields.TryGetValue("Modifiers", out var modifierBox) && keyFields.TryGetValue("Keys", out var keyBox))
+            {
+                var record = new TextBox { Header = "Record shortcut", PlaceholderText = "Click here, then press a shortcut" };
+                record.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, e) =>
+                {
+                    e.Handled = true;
+                    int key = (int)e.Key;
+                    if (key is 16 or 17 or 18 or 91 or 92 or 160 or 161 or 162 or 163 or 164 or 165) return;
+                    var modifiers = new List<int>();
+                    bool IsDown(Windows.System.VirtualKey k) =>
+                        (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(k) &
+                         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+                    if (IsDown(Windows.System.VirtualKey.Control)) modifiers.Add(162);
+                    if (IsDown(Windows.System.VirtualKey.Shift)) modifiers.Add(160);
+                    if (IsDown(Windows.System.VirtualKey.Menu)) modifiers.Add(164);
+                    if (IsDown(Windows.System.VirtualKey.LeftWindows) || IsDown(Windows.System.VirtualKey.RightWindows)) modifiers.Add(91);
+                    if (key is < 1 or > 254) return;
+                    modifierBox.Text = string.Join(", ", modifiers);
+                    keyBox.Text = key.ToString();
+                    record.Text = string.Join(" + ", modifiers.Select(m => m switch { 162 => "Ctrl", 160 => "Shift", 164 => "Alt", _ => "Win" }).Append(e.Key.ToString()));
+                }), true);
+                fields.Children.Add(record);
             }
         }
         kind.SelectedIndex = known;
@@ -138,6 +168,7 @@ public sealed partial class MainWindow
             Grid.SetRow(button, i / 3); Grid.SetColumn(button, i % 3); grid.Children.Add(button);
         }
         host.Children.Add(grid);
+        host.Children.Add(CreateDrawingPad(path));
         var editor = CreateCommandEditor(row is null ? CommandCatalog.Create("HotKey") : _workspace!.GetCommand(row.ProfileKey, row.Index));
         host.Children.Add(editor.View);
         host.Children.Add(Action(row is null ? "Add gesture" : "Save gesture", () =>
@@ -166,6 +197,48 @@ public sealed partial class MainWindow
                 refresh(null);
             }));
         }
+    }
+
+    private Border CreateDrawingPad(TextBox path)
+    {
+        var canvas = new Canvas
+        {
+            Height = 120, Background = (Brush)Root.Resources["PadBrush"]
+        };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(canvas, "Draw a gesture with the left mouse button or touch");
+        var trail = new Polyline { Stroke = (Brush)Root.Resources["PadStroke"], StrokeThickness = 3, StrokeLineJoin = PenLineJoin.Round };
+        canvas.Children.Add(trail);
+        GestureStroke? stroke = null;
+        uint? pointer = null;
+        canvas.PointerPressed += (_, e) =>
+        {
+            var point = e.GetCurrentPoint(canvas);
+            if (!point.Properties.IsLeftButtonPressed || pointer is not null) return;
+            pointer = e.Pointer.PointerId;
+            canvas.CapturePointer(e.Pointer);
+            trail.Points.Clear();
+            trail.Points.Add(point.Position);
+            stroke = new GestureStroke(point.Position.X, point.Position.Y, _settings.EightDirections);
+            path.Text = "";
+            e.Handled = true;
+        };
+        canvas.PointerMoved += (_, e) =>
+        {
+            if (stroke is null || pointer != e.Pointer.PointerId) return;
+            var point = e.GetCurrentPoint(canvas).Position;
+            if (trail.Points.Count < 2000) trail.Points.Add(point);
+            if (stroke.Move(point.X, point.Y)) path.Text = stroke.Path;
+            e.Handled = true;
+        };
+        canvas.PointerReleased += (_, e) =>
+        {
+            if (pointer != e.Pointer.PointerId) return;
+            canvas.ReleasePointerCapture(e.Pointer);
+            stroke = null; pointer = null;
+            e.Handled = true;
+        };
+        canvas.PointerCaptureLost += (_, _) => { stroke = null; pointer = null; };
+        return Card(Paragraph("Draw the gesture here with the left button. You can also use the direction keys above."), canvas);
     }
 
     private void Changed()
