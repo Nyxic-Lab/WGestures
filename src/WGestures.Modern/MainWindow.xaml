@@ -8,6 +8,14 @@
     </Window.SystemBackdrop>
     <Grid x:Name="Root">
         <Grid.Resources>
+            <Style x:Key="Surface" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="Padding" Value="20"/>
+            </Style>
+            <Style x:Key="PrimaryAction" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}"/>
             <DataTemplate x:Key="GestureRowTemplate">
                 <Grid ColumnSpacing="12" Padding="8,10">
                     <Grid.ColumnDefinitions>
