@@ -41,7 +41,6 @@ namespace WGestures.Core.Commands.Impl
                 using var process = Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
             }
 
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         }
     }
 }

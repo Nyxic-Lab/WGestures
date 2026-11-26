@@ -141,6 +141,7 @@ internal sealed class EngineContext : ApplicationContext
             EnableHotCorners = settings.HotCorners,
             EnableRubEdge = settings.RubEdges
         };
+        _parser.CommandFailed += (name, error) => Program.Log("Command failed [" + name + "]: " + error);
         _view = new CanvasWindowGestureView(_parser)
         {
             ShowPath = settings.ShowPath, ShowCommandName = settings.ShowCommandName, ViewFadeOut = settings.FadeOut,

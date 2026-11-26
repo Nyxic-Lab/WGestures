@@ -100,7 +100,7 @@ namespace WGestures.Core.Commands.Impl
                     process.StartInfo.EnvironmentVariables.Add("WG_STARTPOINT_X", Context.StartPoint.X.ToString());
                     process.StartInfo.EnvironmentVariables.Add("WG_STARTPOINT_Y", Context.StartPoint.Y.ToString());
                     process.StartInfo.EnvironmentVariables.Add("WG_ENDPOINT_X", Context.EndPoint.X.ToString());
-                    process.StartInfo.EnvironmentVariables.Add("WG_ENDPOINT_Y", Context.EndPoint.X.ToString());
+                    process.StartInfo.EnvironmentVariables.Add("WG_ENDPOINT_Y", Context.EndPoint.Y.ToString());
                 }
 
                 process.StartInfo.UseShellExecute = false;
@@ -108,7 +108,6 @@ namespace WGestures.Core.Commands.Impl
                 process.StartInfo.CreateNoWindow = !ShowWindow;
                 process.Start();
 
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
             }
 
         }

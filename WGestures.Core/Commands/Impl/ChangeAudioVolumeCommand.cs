@@ -74,7 +74,6 @@ namespace WGestures.Core.Commands.Impl
         {
             //do nothing
 
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced);
         }
 
         public event Action<string> ReportStatus;

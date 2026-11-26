@@ -36,46 +36,32 @@ namespace WGestures.Core
 
         public string Name { get; set; }
 
-        public ExecutionResult Execute(GestureContext context, GestureParser gestureParser)
+        internal void PrepareCommand(GestureContext context, GestureParser gestureParser)
         {
-            //Aware接口依赖注入
+            if (Command == null) throw new InvalidOperationException("Gesture has no command.");
             var contextAware = Command as IGestureContextAware;
             if (contextAware != null) contextAware.Context = context;
-
-            var parserAware = this.Command as IGestureParserAware;
+            var parserAware = Command as IGestureParserAware;
             if (parserAware != null) parserAware.Parser = gestureParser;
+            var shouldInit = Command as INeedInit;
+            if (shouldInit != null && !shouldInit.IsInitialized) shouldInit.Init();
+        }
 
-            var shouldInit = this.Command as INeedInit;
-            if (shouldInit != null && !shouldInit.IsInitialized)
+        public ExecutionResult Execute(GestureContext context, GestureParser gestureParser)
+        {
+            try
             {
-                shouldInit.Init();
+                PrepareCommand(context, gestureParser);
+                if (context != null) context.ActivateTargetWindow();
+                Command.Execute();
+                // Let the runtime manage its working set instead of trimming after every gesture.
+                return new ExecutionResult(null, true);
             }
-            
-            //在独立线程中运行
-            //new Thread似乎反应快一点，ThreadPool似乎有延迟
-            //ThreadPool.QueueUserWorkItem((s) =>
-            //new Thread(() =>
+            catch (Exception ex)
             {
-                try
-                {
-                    context.ActivateTargetWindow();
-                    Command.Execute();
-                    using (var proc = Process.GetCurrentProcess())
-                    {
-                        Native.SetProcessWorkingSetSize(proc.Handle, -1, -1);
-                    }
-                }
-                catch (Exception)
-                {
-                    //ignore errors for now
-#if DEBUG
-                    throw;
-#endif
-                }
-            }//) { IsBackground = false}.Start();
-
-            return new ExecutionResult(null, true);
-
+                Debug.WriteLine("Gesture command failed: " + ex);
+                return new ExecutionResult(ex, false);
+            }
         }
     }
 }

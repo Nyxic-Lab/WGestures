@@ -289,7 +289,7 @@ namespace WGestures.Core.Impl.Windows
                 MSG msg;
                 lock(_msgQueue)
                 {
-                    if(_msgQueue.Count == 0) Monitor.Wait(_msgQueue);
+                    while (_msgQueue.Count == 0) Monitor.Wait(_msgQueue);
                     msg = _msgQueue.Dequeue();
                     UpdateContextAndEventArgs();
                 }
