@@ -1,31 +1,30 @@
-# Nyxic Gestures — modern workspace preview
+# Nyxic Gestures 0.1.0 RC
 
-This project is a separate native WinUI 3 application targeting .NET 10. It loads original WGestures version-3 gesture documents as data, not as executable CLR types. It **does not yet capture mouse gestures or execute commands**.
+Nyxic Gestures is a modern Windows mouse gesture manager based on WGestures by YingDev (GPL-2.0). The settings UI uses WinUI 3 / .NET 10; the background gesture engine uses ported original recognition, mouse and keyboard hooks, and command execution modules on .NET 10. WinForms/GDI+ remain in the engine only for the legacy tray, clipboard, and gesture rendering integrations.
 
-## Build and check on Windows
+## Use
 
-Requirements: Windows 10 2004+ / Windows 11, .NET 10 SDK, Visual Studio/MSBuild with Windows application development tooling, and the Windows App SDK 2.7 runtime for the framework-dependent build.
+1. Install the x64 RC package, or extract the portable ZIP. Exit the original WGestures if it is running.
+2. Open Nyxic Gestures. The bundled defaults include 52 global gestures, 14 app-specific gestures, and eight screen corner/edge commands.
+3. Use Gestures to draw or edit a gesture, record a keyboard shortcut, select triggers/modifiers, configure one of the 12 supported action types, add/remove/reorder actions; Applications for executable profiles, enable/disable and inheritance; Corners & edges to set all eight actions; Preferences for input/feedback, theme, colors, pause shortcut, and optional autostart.
+4. Import an original WG1 version-3 .wg2 configuration and optionally its config.plist. Save workspace persists the editor draft; **Apply & start / reload** validates and activates it in the separate engine. The tray supports pause/resume/exit; closing settings does not stop the engine.
+5. Command-line and Lua actions are disabled until explicitly enabled. Hot corners and rub edges are initially disabled in fresh preferences. Imported arbitrary CLR types are rejected at activation; the reader never activates a type from imported metadata.
+
+## Build and package
+
+Requires Windows 10 2004+ or Windows 11, .NET 10 SDK, Visual Studio/MSBuild with WinUI tooling, and Inno Setup 6.3+ for packaging. From a developer terminal:
 
 ```powershell
 dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj -c Release
+dotnet build src/Engine/Nyxic.Gestures.Engine/Nyxic.Gestures.Engine.csproj -c Release -p:Platform=x64
 msbuild src/WGestures.Modern/WGestures.Modern.csproj /restore /p:Configuration=Release /p:Platform=x64
+./installer/Build-Release.ps1
 ```
 
-The CI workflow performs the configuration checks and an x64 Windows build. A passing build does not establish runtime/UI parity; interactive Windows smoke testing remains necessary.
+The release script generates self-contained UI + engine installer and portable package, corresponding source and SHA-256 checksums in artifacts/release. CI checks compile, configuration tests, installed engine validation, installer/uninstaller, and native hook/window smoke tests when an interactive desktop is available.
 
-## Using the preview
+## Status and limits
 
-- The Overview page summarizes the bundled or loaded document. The original bundled defaults contain 66 gestures, including 52 global gestures, and three application-specific profiles.
-- Gestures: select a profile, search by name/direction/command, choose a row, edit its name or direction, apply the edit, then explicitly save the draft. The trigger, modifier, ordering, command and unknown metadata are preserved.
-- Applications: inspect profile state, executable path and inherited global configuration.
-- Corners & edges: inspect the eight slots in their persisted order.
-- Preferences: switch System, Light and Dark themes for the current session.
-- Import: load an original WG1 version-3 .wg2 document. No arbitrary .NET types are activated.
+This is a functional release candidate, not a stable production release. The original master is unchanged. Manual verification of actual mouse input, action execution, multi-monitor/DPI, elevation boundaries and Lua compatibility is required before stable release. The new settings UI is English; localization and a new update system are not yet implemented. Some old integration behaviors are retained temporarily through WinForms and GDI+ in the engine. Both executables are unsigned.
 
-The preview reads the original bundled defaults if no draft exists. Save draft writes only to `%LOCALAPPDATA%\Nyxic-Lab\Gestures\workspace.wg2`. The original selected file is not overwritten. Do not load an untrusted draft into the legacy engine: its original serializer may resolve CLR types.
-
-## Limitations
-
-The product name is provisional; the repository, license, upstream notices and legacy solution remain intact. No installer, background gesture service, real-time legacy sync, command/trigger/ modifier editor, localization or release build is provided yet. Preferences are session-only. Name/path changes must be applied and saved explicitly.
-
-See [modernization plan](../../docs/modernization.md).
+Data directory: %LOCALAPPDATA%\Nyxic-Lab\Gestures. The legacy WGestures files are not overwritten. A failed activation attempts to restore the previous active configuration; it does not silently restart the old engine.
