@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>WGestures.Core</AssemblyName>
+    <RootNamespace>WGestures.Core</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../WGestures.Core/Commands/IGestureContextAware.cs" Link="Commands/IGestureContextAware.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/IGestureModifiersAware.cs" Link="Commands/IGestureModifiersAware.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/ChangeAudioVolumeCommand.cs" Link="Commands/Impl/ChangeAudioVolumeCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/CmdCommand.cs" Link="Commands/Impl/CmdCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/DoNothingCommand.cs" Link="Commands/Impl/DoNothingCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/GotoUrlCommand.cs" Link="Commands/Impl/GotoUrlCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/HotKeyCommand.cs" Link="Commands/Impl/HotKeyCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/OpenFileCommand.cs" Link="Commands/Impl/OpenFileCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/PauseWGesturesCommand.cs" Link="Commands/Impl/PauseWGesturesCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/ScriptCommand.cs" Link="Commands/Impl/ScriptCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/SearchBox.cs" Link="Commands/Impl/SearchBox.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/SearchBox.Designer.cs" Link="Commands/Impl/SearchBox.Designer.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/SendTextCommand.cs" Link="Commands/Impl/SendTextCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/Sim.cs" Link="Commands/Impl/Sim.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/TaskSwitcherCommand.cs" Link="Commands/Impl/TaskSwitcherCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/WebSearchCommand.cs" Link="Commands/Impl/WebSearchCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/Impl/WindowControlCommand.cs" Link="Commands/Impl/WindowControlCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/INeedInit.cs" Link="Commands/INeedInit.cs" />
+    <Compile Include="../../../WGestures.Core/GestureButton.cs" Link="GestureButton.cs" />
+    <Compile Include="../../../WGestures.Core/GestureContext.cs" Link="GestureContext.cs" />
+    <Compile Include="../../../WGestures.Core/GestureModifier.cs" Link="GestureModifier.cs" />
+    <Compile Include="../../../WGestures.Core/Impl/Windows/ScreenEdgeInteractDetector.cs" Link="Impl/Windows/ScreenEdgeInteractDetector.cs" />
+    <Compile Include="../../../WGestures.Core/Impl/Windows/TouchHook.cs" Link="Impl/Windows/TouchHook.cs" />
+    <Compile Include="../../../WGestures.Core/ScreenCornerAndEdge.cs" Link="ScreenCornerAndEdge.cs" />
+    <Compile Include="../../../WGestures.Core/Impl/Windows/MouseHook.cs" Link="Impl/Windows/MouseHook.cs" />
+    <Compile Include="../../../WGestures.Core/Impl/Windows/Win32GestureContext.cs" Link="Impl/Windows/Win32GestureContext.cs" />
+    <Compile Include="../../../WGestures.Core/Impl/Windows/Win32MousePathTracker2.cs" Link="Impl/Windows/Win32MousePathTracker2.cs" />
+    <Compile Include="../../../WGestures.Core/Persistence/AbstractGestureIntentFinder.cs" Link="Persistence/AbstractGestureIntentFinder.cs" />
+    <Compile Include="../../../WGestures.Core/App.cs" Link="App.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/AbstractCommand.cs" Link="Commands/AbstractCommand.cs" />
+    <Compile Include="../../../WGestures.Core/Gesture.cs" Link="Gesture.cs" />
+    <Compile Include="../../../WGestures.Core/GestureIntent.cs" Link="GestureIntent.cs" />
+    <Compile Include="../../../WGestures.Core/GestureParser.cs" Link="GestureParser.cs" />
+    <Compile Include="../../../WGestures.Core/IGestureIntentFinder.cs" Link="IGestureIntentFinder.cs" />
+    <Compile Include="../../../WGestures.Core/Persistence/IGestureIntentStore.cs" Link="Persistence/IGestureIntentStore.cs" />
+    <Compile Include="../../../WGestures.Core/Commands/IGestureParserAware.cs" Link="Commands/IGestureParserAware.cs" />
+    <Compile Include="../../../WGestures.Core/IPathTracker.cs" Link="IPathTracker.cs" />
+    <Compile Include="../../../WGestures.Core/Persistence/Impl/Windows/Win32GestrueIntentFinder.cs" Link="Persistence/Impl/Windows/Win32GestrueIntentFinder.cs" />
+    <Compile Include="../../../WGestures.Core/Properties/Annotations.cs" Link="Properties/Annotations.cs" />
+    <EmbeddedResource Include="../../../WGestures.Core/Commands/Impl/SearchBox.resx" Link="Commands/Impl/SearchBox.resx" />
+    <ProjectReference Include="../WGestures.Common/WGestures.Common.csproj" />
+    <ProjectReference Include="../WindowsInput/WindowsInput.csproj" />
+    <PackageReference Include="NLua" Version="1.7.9" />
+    <PackageReference Include="KeraLua" Version="1.4.9" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+</Project>
