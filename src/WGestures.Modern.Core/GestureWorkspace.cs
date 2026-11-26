@@ -126,7 +126,8 @@ public sealed class GestureWorkspace
             // Original radio button tags define the persisted order.
             var items = Array(_document["HotCornerCommands"], "HotCornerCommands");
             if (items.Count != 8) throw new InvalidDataException("Expected eight corner/edge slots.");
-            return items.Select((item, i) => new CornerAction(i < 4 ? $"Corner {i + 1}" : $"Edge {i - 3}",
+            var names = new[] { "Bottom-left corner", "Top-left corner", "Top-right corner", "Bottom-right corner", "Left edge", "Top edge", "Right edge", "Bottom edge" };
+            return items.Select((item, i) => new CornerAction(names[i],
                 CommandName(item))).ToArray();
         }
     }
