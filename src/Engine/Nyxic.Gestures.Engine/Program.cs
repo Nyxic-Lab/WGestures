@@ -49,6 +49,7 @@ internal static class Program
                 _ = new WorkspaceIntentStore(GestureWorkspace.Open(path), EngineSettings.Read(settingsPath));
                 return 0;
             }
+            bool smoke = args is ["--smoke-hooks"];
             using var instance = new Mutex(true, EngineSettings.EngineMutex, out bool created);
             if (!created) return 2;
             if (Process.GetProcessesByName("WGestures").Any())
@@ -57,14 +58,39 @@ internal static class Program
             using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, EngineSettings.ReadyEvent);
             stop.Reset();
             ready.Reset();
-            var settings = EngineSettings.Read();
-            var store = new WorkspaceIntentStore(GestureWorkspace.Open(EngineSettings.ActivePath), settings);
+            var settings = smoke ? new EngineSettings() : EngineSettings.Read();
+            var workspace = smoke
+                ? GestureWorkspace.Parse("""{"FileVersion":"3","Global":{"Name":"Global","IsGesturingEnabled":false,"GestureIntents":[]},"Apps":{},"HotCornerCommands":[null,null,null,null,null,null,null,null]}""")
+                : GestureWorkspace.Open(EngineSettings.ActivePath);
+            var store = new WorkspaceIntentStore(workspace, settings);
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             using var context = new EngineContext(store, settings, stop, ready);
+            bool smokePassed = false;
+            using var smokeTimer = new System.Windows.Forms.Timer { Interval = 200 };
+            int elapsed = 0;
+            if (smoke)
+            {
+                smokeTimer.Tick += (_, _) =>
+                {
+                    elapsed += 200;
+                    if (ready.WaitOne(0))
+                    {
+                        smokePassed = true;
+                        stop.Set();
+                        smokeTimer.Stop();
+                    }
+                    else if (elapsed >= 8000)
+                    {
+                        stop.Set();
+                        smokeTimer.Stop();
+                    }
+                };
+                smokeTimer.Start();
+            }
             Application.Run(context);
-            return 0;
+            return smoke && !smokePassed ? 4 : 0;
         }
         catch (Exception ex)
         {
