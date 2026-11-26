@@ -1,0 +1,55 @@
+<Window
+    x:Class="WGestures.Modern.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="WGestures · Modern">
+    <Grid>
+        <NavigationView x:Name="Nav"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        PaneDisplayMode="Left"
+                        OpenPaneLength="236"
+                        SelectionChanged="Nav_SelectionChanged">
+            <NavigationView.PaneHeader>
+                <StackPanel Padding="8,22,8,20" Spacing="6">
+                    <TextBlock Text="WGestures" FontSize="24" FontWeight="SemiBold"/>
+                    <TextBlock Text="Modern desktop experience" Opacity="0.65" FontSize="12"/>
+                </StackPanel>
+            </NavigationView.PaneHeader>
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Overview" Tag="overview" Icon="Home"/>
+                <NavigationViewItem Content="Gestures" Tag="gestures" Icon="Edit"/>
+                <NavigationViewItem Content="Applications" Tag="apps" Icon="AllApps"/>
+                <NavigationViewItem Content="Corners &amp; edges" Tag="corners" Icon="FullScreen"/>
+                <NavigationViewItem Content="Preferences" Tag="settings" Icon="Setting"/>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="About" Tag="about" Icon="Help"/>
+            </NavigationView.FooterMenuItems>
+            <NavigationView.Content>
+                <ScrollViewer>
+                    <StackPanel Padding="36,28,36,40" Spacing="20" MaxWidth="920" HorizontalAlignment="Left">
+                        <TextBlock x:Name="PageEyebrow" Text="WORKSPACE" FontSize="12" Opacity="0.6"/>
+                        <TextBlock x:Name="PageTitle" Text="Overview" FontSize="32" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="PageDescription" Text="A new home for WGestures." FontSize="15" TextWrapping="Wrap" Opacity="0.75"/>
+                        <InfoBar x:Name="MigrationBanner" IsOpen="True" IsClosable="False"
+                                 Severity="Informational" Title="Preview UI"
+                                 Message="This new application is an independent interface prototype. Gesture configuration and the recognition engine are not connected yet."/>
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1" CornerRadius="12" Padding="24">
+                            <StackPanel Spacing="14">
+                                <TextBlock x:Name="CardTitle" Text="Modernization in progress" FontSize="20" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="CardDescription" Text="The existing gesture engine and settings remain in the legacy WGestures application while they are migrated and tested." TextWrapping="Wrap" FontSize="14" Opacity="0.8"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xE10F;" FontSize="16"/>
+                                    <TextBlock Text="Native WinUI 3 · .NET 10 LTS · Fluent Design" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </NavigationView.Content>
+        </NavigationView>
+    </Grid>
+</Window>
