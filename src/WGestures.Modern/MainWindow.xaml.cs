@@ -232,7 +232,11 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Add(Card(Heading("Your gestures"), Paragraph("Browse global gestures and per-application assignments."),
             Action("Open gesture library", () => Navigate("gestures"), true)));
         PageHost.Children.Add(Card(Heading("Configuration"), Paragraph("Import original WGestures version-3 files or export your configuration."),
-            ImportButton(), ExportButton(), Action("Save workspace", SaveDraft)));
+            ImportButton(), ExportButton(), Action("Save workspace", SaveDraft), AsyncAction("Restore bundled defaults", async () =>
+            {
+                if (!await ConfirmAsync("Restore default gestures", "Replace the current workspace with bundled gestures? Active settings will not change until applied.", "Restore defaults")) return;
+                OpenWorkspace(BundledPath); Changed(); Render();
+            })));
     }
 
     private void RenderGestures()
@@ -399,10 +403,31 @@ public sealed partial class MainWindow : Window
         initialMs.ValueChanged += (_, e) => { if (!double.IsNaN(e.NewValue)) { _settings = _settings with { InitialStayMilliseconds = (int)e.NewValue }; Changed(); } };
         var stayMs = new NumberBox { Header = "Gesture stay timeout (ms)", Minimum = 50, Maximum = 10000, Value = _settings.StayMilliseconds, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
         stayMs.ValueChanged += (_, e) => { if (!double.IsNaN(e.NewValue)) { _settings = _settings with { StayMilliseconds = (int)e.NewValue }; Changed(); } };
+        Expander ColorOption(string label, int argb, Action<int> set)
+        {
+            uint value = unchecked((uint)argb);
+            var picker = new ColorPicker
+            {
+                Color = Windows.UI.Color.FromArgb((byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value),
+                IsAlphaEnabled = true,
+                IsColorPreviewVisible = true
+            };
+            picker.ColorChanged += (_, e) =>
+            {
+                var color = e.NewColor;
+                set(unchecked((int)((uint)color.A << 24 | (uint)color.R << 16 | (uint)color.G << 8 | color.B)));
+                Changed();
+            };
+            return new Expander { Header = label, Content = picker, HorizontalAlignment = HorizontalAlignment.Stretch };
+        }
         PageHost.Children.Add(Card(Heading("Appearance"), theme,
             Toggle("Show gesture trail", _settings.ShowPath, v => _settings = _settings with { ShowPath = v }),
             Toggle("Show action name", _settings.ShowCommandName, v => _settings = _settings with { ShowCommandName = v }),
-            Toggle("Fade out gesture trail", _settings.FadeOut, v => _settings = _settings with { FadeOut = v })));
+            Toggle("Fade out gesture trail", _settings.FadeOut, v => _settings = _settings with { FadeOut = v }),
+            ColorOption("Right-button trail", _settings.RightTrailColor, v => _settings = _settings with { RightTrailColor = v }),
+            ColorOption("Middle-button trail", _settings.MiddleTrailColor, v => _settings = _settings with { MiddleTrailColor = v }),
+            ColorOption("X-button trail", _settings.XTrailColor, v => _settings = _settings with { XTrailColor = v }),
+            ColorOption("Unrecognized trail", _settings.UnrecognizedTrailColor, v => _settings = _settings with { UnrecognizedTrailColor = v })));
         PageHost.Children.Add(Card(Heading("Input"), Paragraph("Trigger buttons"), buttons,
             Toggle("Eight directions", _settings.EightDirections, v => _settings = _settings with { EightDirections = v }),
             Toggle("Disable in fullscreen", _settings.DisableFullscreen, v => _settings = _settings with { DisableFullscreen = v }),
@@ -415,6 +440,34 @@ public sealed partial class MainWindow : Window
             Toggle("Rub edges", _settings.RubEdges, v => _settings = _settings with { RubEdges = v })));
         PageHost.Children.Add(Card(Heading("Script actions"), Paragraph("Only enable command-line and Lua actions for configurations you trust."),
             Toggle("Allow command-line and Lua actions", _settings.AllowScripts, v => _settings = _settings with { AllowScripts = v })));
+        var pauseKey = new NumberBox { Header = "Pause shortcut key (virtual-key code; 0 disables)", Minimum = 0, Maximum = 254,
+            Value = _settings.PauseKey, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        pauseKey.ValueChanged += (_, e) => { if (!double.IsNaN(e.NewValue)) { _settings = _settings with { PauseKey = (int)e.NewValue }; Changed(); } };
+        var pauseModifiers = new StackPanel { Spacing = 4 };
+        foreach (var (bit, label) in new[] { (1, "Alt"), (2, "Ctrl"), (4, "Shift"), (8, "Windows") })
+        {
+            var check = new CheckBox { Content = label, IsChecked = (_settings.PauseModifiers & bit) != 0 };
+            check.Checked += (_, _) => { _settings = _settings with { PauseModifiers = _settings.PauseModifiers | bit }; Changed(); };
+            check.Unchecked += (_, _) => { _settings = _settings with { PauseModifiers = _settings.PauseModifiers & ~bit }; Changed(); };
+            pauseModifiers.Children.Add(check);
+        }
+        PageHost.Children.Add(Card(Heading("Startup and global shortcut"),
+            Toggle("Start gesture engine when I sign in", _settings.AutoStart, v => _settings = _settings with { AutoStart = v }),
+            Paragraph("Pause shortcut: A–Z = 65–90; F1–F12 = 112–123. The tray menu also supports pause and resume."),
+            pauseKey, pauseModifiers));
+        PageHost.Children.Add(Card(Heading("Legacy preferences"),
+            AsyncAction("Import config.plist…", async () =>
+            {
+                var picker = new FileOpenPicker();
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                picker.FileTypeFilter.Add(".plist");
+                var file = await picker.PickSingleFileAsync();
+                if (file is null) return;
+                if (!await ConfirmAsync("Import old preferences", "Replace the current preferences with the original configuration? Auto-start and scripts must be opted in separately.", "Import")) return;
+                _settings = EngineSettings.ImportLegacyPlist(file.Path) with { Theme = _settings.Theme };
+                Changed(); Render();
+                Notify("Legacy preferences imported", "Apply the configuration to activate them.", InfoBarSeverity.Success);
+            })));
         PageHost.Children.Add(Card(Heading("Save preferences"), Action("Save workspace", SaveDraft), AsyncAction("Apply & start / reload", ApplyAndStartAsync, true)));
     }
 
