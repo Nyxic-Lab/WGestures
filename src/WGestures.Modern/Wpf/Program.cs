@@ -25,11 +25,16 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        bool smoke = args.Length == 2 && args[0] == "--smoke-ui";
+        bool smoke = args.Length == 2 && (args[0] == "--smoke-ui" || args[0] == "--smoke-ui-compat");
+        bool forceCompatibility = args.Contains("--compatibility", StringComparer.OrdinalIgnoreCase) ||
+            (smoke && args[0] == "--smoke-ui-compat");
         if (smoke) _log = Path.GetFullPath(args[1]);
         try
         {
             Log("WPF settings startup");
+            Theme.Configure(forceCompatibility);
+            if (!Theme.Profile.MeetsMinimum)
+                throw new PlatformNotSupportedException("Nyxic Gestures requires Windows 10 version 1607 (build 14393) or later.");
             var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
             app.DispatcherUnhandledException += (_, e) =>
             {
@@ -55,6 +60,11 @@ internal static class Program
                     try
                     {
                         window.RunSmokeChecks();
+                        if (forceCompatibility)
+                        {
+                            if (!Theme.IsClassic) throw new InvalidOperationException("Compatibility mode was not selected.");
+                            Log("PASS classic WPF compatibility mode");
+                        }
                         Log("PASS WPF window, six pages, theme and twelve action editors");
                         app.Shutdown(0);
                     }
