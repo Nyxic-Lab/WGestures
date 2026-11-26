@@ -44,6 +44,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Validate packaging script syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $script = (Resolve-Path ./installer/Build-Release.ps1).Path
+          $null = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host $_.ToString() }
+            throw 'Packaging script syntax validation failed.'
+          }
+          Write-Host 'PASS PowerShell packaging script syntax'
       - name: Run configuration regression checks
         run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj --configuration Release
       - name: Compile native WPF settings application
