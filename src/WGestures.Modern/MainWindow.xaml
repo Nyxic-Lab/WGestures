@@ -8,6 +8,8 @@
     </Window.SystemBackdrop>
     <Grid x:Name="Root">
         <Grid.Resources>
+            <SolidColorBrush x:Key="PadBrush" Color="#202B3D"/>
+            <SolidColorBrush x:Key="PadStroke" Color="#8DB3FF"/>
             <Style x:Key="Surface" TargetType="Border">
                 <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
                 <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
