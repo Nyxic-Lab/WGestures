@@ -100,7 +100,17 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
     }
 
     $installerScript = Join-Path $PSScriptRoot 'NyxicGestures.iss'
-    if (-not (Select-String -Path $installerScript -Pattern '^MinVersion=10\.0\.14393\s* "NyxicGestures-$Version-win-x64-Setup.exe"
+    if (-not (Select-String -Path $installerScript -Pattern '^MinVersion=10\.0\.14393\s*$' -Quiet)) {
+        throw 'Installer minimum must match Windows 10 1607 compatibility policy.'
+    }
+    [xml]$manifest = Get-Content (Join-Path $repo 'src\WGestures.Modern\app.manifest') -Raw
+    $dpi = $manifest.SelectSingleNode("//*[local-name()='dpiAwareness']")
+    if ($null -eq $dpi -or $dpi.InnerText -ne 'PerMonitorV2, PerMonitor') {
+        throw 'WPF manifest must retain the older per-monitor DPI fallback.'
+    }
+    Write-Host 'PASS Windows 10 minimum installer and DPI manifest policy'
+
+    $setup = Join-Path $output "NyxicGestures-$Version-win-x64-Setup.exe"
     $source = Join-Path $output "NyxicGestures-$Version-source.zip"
     $portable = Join-Path $output "NyxicGestures-$Version-win-x64-portable.zip"
     $checksum = Join-Path $output 'SHA256SUMS.txt'
@@ -172,133 +182,6 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
                     finally {
                         if (-not $smoke.HasExited) { Stop-Process -Id $smoke.Id -Force }
                     }
-                }
-
-                $ui = Start-Process $uiExe -WorkingDirectory $testDir -PassThru
-                try {
-                    $deadline = [DateTime]::UtcNow.AddSeconds(20)
-                    do {
-                        Start-Sleep -Milliseconds 250
-                        $ui.Refresh()
-                        if ($ui.HasExited) {
-                            $uiLog = Join-Path $env:LOCALAPPDATA 'Nyxic-Lab\Gestures\ui-status.log'
-                            if (Test-Path $uiLog) { Get-Content $uiLog }
-                            throw "Normal WPF launch failed: $($ui.ExitCode)"
-                        }
-                    } while ($ui.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline)
-                    if ($ui.MainWindowHandle -eq 0) { throw 'WPF main window did not appear.' }
-                    if (-not $ui.CloseMainWindow()) { throw 'Could not close the WPF main window.' }
-                    if (-not $ui.WaitForExit(10000)) { throw 'WPF did not exit after closing its window.' }
-                    if ($ui.ExitCode -ne 0) { throw "WPF exited with code $($ui.ExitCode)" }
-                    Write-Host 'PASS normal WPF launch and close'
-                }
-                finally {
-                    if (-not $ui.HasExited) { Stop-Process -Id $ui.Id -Force }
-                }
-            } else {
-                throw 'RC smoke tests require an interactive Windows desktop; no release artifact will be uploaded.'
-            }
-
-            $uninstall = Get-ChildItem $testDir -Filter 'unins*.exe' | Select-Object -First 1
-            if (-not $uninstall) { throw 'Uninstaller was not created.' }
-            $process = Start-Process -FilePath $uninstall.FullName -ArgumentList @(
-                '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
-            if ($process.ExitCode -ne 0) { throw "Uninstaller smoke test failed: $($process.ExitCode)" }
-            if (Test-Path (Join-Path $testDir 'WGestures.Modern.exe')) {
-                throw 'Application executable remains after uninstall.'
-            }
-            Write-Host 'PASS installer and uninstaller smoke test'
-        }
-        finally {
-            if (Test-Path $testDir) { Remove-Item $testDir -Recurse -Force }
-        }
-    }
-
-    @($setup, $portable, $source) | ForEach-Object {
-        $hash = (Get-FileHash -Path $_ -Algorithm SHA256).Hash.ToLowerInvariant()
-        "$hash  $([IO.Path]::GetFileName($_))"
-    } | Set-Content $checksum -Encoding ascii
-    Get-ChildItem $output -File | Select-Object Name, Length
-    Get-Content $checksum
-}
-finally {
-    Pop-Location
-    if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-}
- -Quiet)) {
-        throw 'Installer minimum must match Windows 10 1607 compatibility policy.'
-    }
-    [xml]$manifest = Get-Content (Join-Path $repo 'src\WGestures.Modern\app.manifest') -Raw
-    $dpi = $manifest.SelectSingleNode("//*[local-name()='dpiAwareness']")
-    if ($null -eq $dpi -or $dpi.InnerText -ne 'PerMonitorV2, PerMonitor') {
-        throw 'WPF manifest must retain the older per-monitor DPI fallback.'
-    }
-    Write-Host 'PASS Windows 10 minimum installer and DPI manifest policy'
-
-    $setup = Join-Path $output "NyxicGestures-$Version-win-x64-Setup.exe"
-    $source = Join-Path $output "NyxicGestures-$Version-source.zip"
-    $portable = Join-Path $output "NyxicGestures-$Version-win-x64-portable.zip"
-    $checksum = Join-Path $output 'SHA256SUMS.txt'
-    foreach ($file in @($setup, $source, $portable, $checksum)) {
-        if (Test-Path $file) { Remove-Item $file -Force }
-    }
-
-    Invoke-Checked $compiler @("/DPayloadDir=$payload", "/DOutputDir=$output",
-        "/DAppVersion=$Version", (Join-Path $PSScriptRoot 'NyxicGestures.iss'))
-    if (-not (Test-Path $setup -PathType Leaf)) { throw 'Installer was not created.' }
-
-    [IO.Compression.ZipFile]::CreateFromDirectory($payload, $portable)
-    Invoke-Checked 'git' @('archive', '--format=zip', "--output=$source", $commit)
-
-    # Exercise the real installed WPF UI, native hooks, and install/uninstall on CI.
-    if ($env:CI -eq 'true') {
-        $testDir = Join-Path $env:RUNNER_TEMP ('NyxicGesturesSmoke-' + [Guid]::NewGuid().ToString('N'))
-        try {
-            $process = Start-Process -FilePath $setup -ArgumentList @(
-                '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
-                "/DIR=""$testDir""", '/TASKS=""') -Wait -PassThru
-            if ($process.ExitCode -ne 0) { throw "Installer smoke test failed: $($process.ExitCode)" }
-            foreach ($file in @('WGestures.Modern.exe', 'coreclr.dll', 'PresentationFramework.dll', 'PresentationFramework.Fluent.dll',
-                'engine\Nyxic.Gestures.Engine.exe', 'engine\WGestures.Core.dll', 'defaults\gestures.wg2', 'LICENSE.txt')) {
-                if (-not (Test-Path (Join-Path $testDir $file))) {
-                    throw "Installed payload missing: $file"
-                }
-            }
-            $installedEngine = Join-Path $testDir 'engine\Nyxic.Gestures.Engine.exe'
-            $installedFixture = Join-Path $testDir 'defaults\gestures.wg2'
-            $validation = Start-Process $installedEngine -ArgumentList @('--validate', ('"' + $installedFixture + '"'), ('"' + $validationSettings + '"')) -Wait -PassThru
-            if ($validation.ExitCode -ne 0) { throw 'Installed engine validation failed.' }
-            Write-Host 'PASS installed engine validates real configuration'
-
-            if ([Environment]::UserInteractive) {
-                $hookTest = Start-Process $installedEngine -ArgumentList '--smoke-hooks' -PassThru
-                if (-not $hookTest.WaitForExit(20000)) {
-                    Stop-Process -Id $hookTest.Id -Force
-                    throw 'Native hook lifecycle smoke test timed out.'
-                }
-                if ($hookTest.ExitCode -ne 0) {
-                    $log = Join-Path $env:LOCALAPPDATA 'Nyxic-Lab\Gestures\engine-status.log'
-                    if (Test-Path $log) { Get-Content $log }
-                    throw "Native hook lifecycle smoke test failed: $($hookTest.ExitCode)"
-                }
-                Write-Host 'PASS native hook startup and shutdown (no active actions)'
-                $uiSmokeLog = Join-Path $stage 'wpf-smoke.log'
-                $uiExe = Join-Path $testDir 'WGestures.Modern.exe'
-                $smoke = Start-Process $uiExe -ArgumentList @('--smoke-ui', ('"' + $uiSmokeLog + '"')) -WorkingDirectory $testDir -PassThru
-                try {
-                    if (-not $smoke.WaitForExit(45000)) {
-                        Stop-Process -Id $smoke.Id -Force
-                        throw 'WPF smoke test timed out.'
-                    }
-                    if (Test-Path $uiSmokeLog) { Get-Content $uiSmokeLog }
-                    if ($smoke.ExitCode -ne 0) { throw "WPF smoke test failed: $($smoke.ExitCode)" }
-                    if (-not (Test-Path $uiSmokeLog) -or -not (Select-String -Path $uiSmokeLog -Pattern 'PASS WPF window, six pages, theme and twelve action editors' -Quiet)) {
-                        throw 'WPF smoke test did not reach the full UI pass marker.'
-                    }
-                    Write-Host 'PASS installed WPF UI, six pages, theme and twelve command editors'
-                }
-                finally {
-                    if (-not $smoke.HasExited) { Stop-Process -Id $smoke.Id -Force }
                 }
 
                 $ui = Start-Process $uiExe -WorkingDirectory $testDir -PassThru
