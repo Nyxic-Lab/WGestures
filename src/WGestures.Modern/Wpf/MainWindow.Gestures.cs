@@ -232,8 +232,8 @@ internal sealed partial class MainWindow
                 }
                 else
                 {
-                    string initial = field.Kind == "keys" && value is JsonArray arr
-                        ? string.Join(", ", arr.Select(v => v?.ToString()))
+                    string initial = field.Kind == "keys" && value is JsonArray initialKeys
+                        ? string.Join(", ", initialKeys.Select(v => v?.ToString()))
                         : field.Kind == "int" ? value?.ToString() ?? "1" : value?.GetValue<string>() ?? "";
                     var input = Input(initial, field.Kind == "multiline");
                     if (field.Kind == "keys") keyFields[field.Key] = input;
