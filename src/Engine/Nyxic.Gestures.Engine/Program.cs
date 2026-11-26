@@ -49,7 +49,11 @@ internal static class Program
                 _ = new WorkspaceIntentStore(GestureWorkspace.Open(path), EngineSettings.Read(settingsPath));
                 return 0;
             }
-            bool smoke = args is ["--smoke-hooks"];
+            bool compatibilitySmoke = args is ["--smoke-hooks-compat"];
+            bool smoke = args is ["--smoke-hooks"] || compatibilitySmoke;
+            var compatibility = WindowsCompatibility.Current(compatibilitySmoke);
+            if (!compatibility.MeetsMinimum)
+                throw new PlatformNotSupportedException("Nyxic Gestures requires Windows 10 version 1607 (build 14393) or later.");
             using var instance = new Mutex(true, EngineSettings.EngineMutex, out bool created);
             if (!created) return 2;
             if (Process.GetProcessesByName("WGestures").Any())
@@ -63,7 +67,9 @@ internal static class Program
                 ? GestureWorkspace.Parse("""{"FileVersion":"3","Global":{"Name":"Global","IsGesturingEnabled":false,"GestureIntents":[]},"Apps":{},"HotCornerCommands":[null,null,null,null,null,null,null,null]}""")
                 : GestureWorkspace.Open(EngineSettings.ActivePath);
             var store = new WorkspaceIntentStore(workspace, settings);
-            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            var dpiMode = compatibility.UsePerMonitorV2 ? HighDpiMode.PerMonitorV2 : HighDpiMode.PerMonitor;
+            bool dpiConfigured = Application.SetHighDpiMode(dpiMode);
+            Log($"Windows {compatibility.WindowsVersion}; requested DPI mode: {dpiMode}; configured={dpiConfigured}");
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             using var context = new EngineContext(store, settings, stop, ready);
