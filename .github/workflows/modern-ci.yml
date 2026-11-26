@@ -44,11 +44,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - uses: microsoft/setup-msbuild@v2
       - name: Run configuration regression checks
         run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj --configuration Release
-      - name: Compile native settings application
-        run: msbuild src/WGestures.Modern/WGestures.Modern.csproj /restore /p:Configuration=Release /p:Platform=x64 /m
+      - name: Compile native WPF settings application
+        run: dotnet build src/WGestures.Modern/WGestures.Modern.csproj -c Release -p:Platform=x64
 
       - name: Ensure Inno Setup is installed
         if: github.event_name != 'push'
@@ -67,7 +66,7 @@ jobs:
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: NyxicGestures-0.1.0-rc.1-win-x64-Setup
+          name: NyxicGestures-0.1.0-rc.2-win-x64-Setup
           path: artifacts/release/*-Setup.exe
           if-no-files-found: error
           compression-level: 0
@@ -76,7 +75,7 @@ jobs:
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: NyxicGestures-0.1.0-rc.1-portable-and-source
+          name: NyxicGestures-0.1.0-rc.2-portable-and-source
           path: |
             artifacts/release/*.zip
             artifacts/release/SHA256SUMS.txt
