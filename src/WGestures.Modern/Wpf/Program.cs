@@ -48,7 +48,7 @@ internal static class Program
                 try { settings = EngineSettings.Read(EngineSettings.PreferencesPath); }
                 catch (Exception e) { Log("Preferences load: " + e); }
             }
-            Theme.Apply(settings.Theme);
+            Theme.Apply(smoke ? "Light" : settings.Theme);
             var window = new MainWindow(settings, smoke);
             app.MainWindow = window;
             if (smoke)
@@ -59,7 +59,8 @@ internal static class Program
                     timer.Stop();
                     try
                     {
-                        window.RunSmokeChecks();
+                        string evidence = Path.Combine(Path.GetDirectoryName(_log)!, Path.GetFileNameWithoutExtension(_log) + "-screens");
+                        window.RunSmokeChecks(evidence);
                         if (forceCompatibility)
                         {
                             if (!Theme.IsClassic) throw new InvalidOperationException("Compatibility mode was not selected.");

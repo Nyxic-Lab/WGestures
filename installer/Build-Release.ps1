@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.1.0-rc.3',
+    [string]$Version = '0.1.0-rc.4',
     [string]$OutputDirectory
 )
 
@@ -177,6 +177,13 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
                         if ($uiMode -eq '--smoke-ui-compat' -and -not (Select-String -Path $uiSmokeLog -Pattern 'PASS classic WPF compatibility mode' -Quiet)) {
                             throw 'Forced classic WPF compatibility mode was not exercised.'
                         }
+                        $screens = Join-Path $stage (([IO.Path]::GetFileNameWithoutExtension($uiSmokeLog)) + '-screens')
+                        if (-not (Test-Path $screens)) { throw "Missing UI visual evidence: $uiMode" }
+                        $pngs = @(Get-ChildItem $screens -File -Filter '*.png')
+                        if ($pngs.Count -lt 8) { throw "Incomplete UI visual evidence: $uiMode" }
+                        $evidenceDir = Join-Path $output ('ui-evidence\' + $uiMode.TrimStart('-'))
+                        New-Item -ItemType Directory -Path $evidenceDir -Force | Out-Null
+                        Copy-Item (Join-Path $screens '*.png') $evidenceDir -Force
                         Write-Host "PASS installed WPF UI, six pages, theme and twelve command editors ($uiMode)"
                     }
                     finally {

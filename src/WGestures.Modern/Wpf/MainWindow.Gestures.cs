@@ -432,19 +432,42 @@ internal sealed partial class MainWindow
     private void RenderCorners()
     {
         var workspace = _workspace!;
-        Add(_page, Card("Screen interactions", Text("Hot corners and edge rubbing must be enabled in Preferences. The same command library is available for all eight slots."),
-            Button("Open preferences", () => Navigate("settings"))));
-        int i = 0;
-        foreach (var slot in workspace.Corners)
+        var screen = new Grid();
+        for (int i = 0; i < 3; i++)
         {
-            int index = i++;
-            Add(_page, Card(slot.Name, Text("Current action: " + slot.Command, muted: true),
-                Button("Change action", () =>
+            screen.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            screen.RowDefinitions.Add(new RowDefinition { Height = new GridLength(88) });
+        }
+        var locations = new[] { (2,0), (0,0), (0,2), (2,2), (1,0), (0,1), (1,2), (2,1) };
+        for (int i = 0; i < workspace.Corners.Count; i++)
+        {
+            int index = i;
+            var slot = workspace.Corners[index];
+            var content = Stack(Text(slot.Name, 12, true), Text(CommandCatalog.Find(slot.Command)?.Label ?? slot.Command, 11, muted: true));
+            var button = MakeButton(slot.Name);
+            button.Content = content;
+            AutomationProperties.SetName(button, slot.Name + ": " + slot.Command);
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
+            button.VerticalAlignment = VerticalAlignment.Stretch;
+            button.Margin = new Thickness(3);
+            button.Click += (_, _) =>
+            {
+                try
                 {
                     var edit = BuildCommandEditor(workspace.GetCornerCommand(index));
                     if (EditDialog(slot.Name, edit.View, "Save", () => { workspace.SetCornerCommand(index, edit.Read()); Changed(); }))
                         Render();
-                })));
+                }
+                catch (Exception ex) { Notify("Could not edit screen action", ex.Message, true); }
+            };
+            Grid.SetRow(button, locations[i].Item1); Grid.SetColumn(button, locations[i].Item2);
+            screen.Children.Add(button);
         }
+        var monitor = new Border { CornerRadius = new CornerRadius(10), Margin = new Thickness(3), Child = Stack(Text("SCREEN", 13, true), Text("8 action zones", 11, muted: true)), Padding = new Thickness(12) };
+        monitor.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        Grid.SetRow(monitor, 1); Grid.SetColumn(monitor, 1); screen.Children.Add(monitor);
+        Add(_page, Card("Screen action map", Text("Choose a corner or edge to edit its assigned command.", muted: true), screen));
+        Add(_page, Card("Activation", Text("Hot corners: " + (_settings.HotCorners ? "On" : "Off") + "  ·  Edge rubbing: " + (_settings.RubEdges ? "On" : "Off")),
+            Button("Open preferences", () => Navigate("settings"))));
     }
 }
