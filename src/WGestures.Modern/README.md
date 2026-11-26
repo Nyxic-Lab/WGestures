@@ -1,6 +1,6 @@
-# Nyxic Gestures 0.1.0 RC2
+# Nyxic Gestures 0.1.0 RC3
 
-Nyxic Gestures is a modern Windows mouse gesture manager based on WGestures by YingDev (GPL-2.0). The settings application is code-first C# with .NET 10 WPF and Microsoft's Fluent theme. It has no WinUI or Windows App SDK dependency. A separate .NET 10 process runs the ported original gesture recognizer, mouse and keyboard hooks, and action engine. WinForms/GDI+ remain in the engine for the original tray, clipboard and gesture-overlay integrations.
+Nyxic Gestures is a modern Windows mouse gesture manager based on WGestures by YingDev (GPL-2.0). The settings application is code-first C# with .NET 10 WPF: Fluent on Windows 11, classic WPF compatibility controls on Windows 10. It has no WinUI or Windows App SDK dependency. A separate .NET 10 process runs the ported original gesture recognizer, mouse and keyboard hooks, and action engine. WinForms/GDI+ remain in the engine for the original tray, clipboard and gesture-overlay integrations.
 
 ## Use
 
@@ -12,7 +12,7 @@ Nyxic Gestures is a modern Windows mouse gesture manager based on WGestures by Y
 
 ## Build and package
 
-Requires Windows 10 2004+ or Windows 11, .NET 10 SDK, and Inno Setup 6.3+ for packaging. Visual Studio's WinUI workloads are not required.
+The installed x64 runtime targets Windows 10 version 1607 (build 14393) and newer; earlier Windows 10 1507/1511 and x86 are outside the target. Use a currently supported development machine with .NET 10 SDK and Inno Setup 6.3+ for packaging. Visual Studio's WinUI workloads are not required.
 
 ```powershell
 dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj -c Release
@@ -21,10 +21,16 @@ dotnet build src/WGestures.Modern/WGestures.Modern.csproj -c Release -p:Platform
 ./installer/Build-Release.ps1
 ```
 
-The release script publishes a self-contained WPF UI and gesture engine, installer, portable ZIP, source and SHA-256 checksums. CI requires an interactive Windows desktop: it validates the installed engine, starts and stops the native hooks without executing actions, launches the installed WPF window, exercises six pages, the theme and twelve command editors, checks normal launch/close, and verifies uninstall. A failed test blocks artifact publication.
+The release script publishes a self-contained WPF UI and gesture engine, installer, portable ZIP, source and SHA-256 checksums. CI requires an interactive Windows desktop: it validates the installed engine, starts and stops the native hooks without executing actions, launches the installed WPF window, exercises six pages, the theme and twelve command editors, checks normal launch/close, forces both classic WPF and older per-monitor DPI paths, and verifies uninstall. The hosted Windows runner does not certify an actual 1607 or 1809 installation. A failed test blocks artifact publication.
+
+## Windows compatibility
+
+Windows 10 selects classic WPF controls automatically, retaining the page layout, gestures, commands, and light/dark shell palettes. Legacy input controls use the system-native field palette for contrast. Windows 11 retains Fluent; launch `WGestures.Modern.exe --compatibility` to force classic controls for troubleshooting. The About page and `ui-status.log` report the detected Windows build and selected UI path. Per-monitor DPI v2 is used from build 15063 (1703) onward; earlier builds use first-generation per-monitor DPI.
+
+See [the compatibility matrix and local smoke tests](../../docs/windows-compatibility.md). Windows 10 1607 is a best-effort compatibility target, not a current OS servicing guarantee; install available system updates and use a supported Windows edition for production.
 
 ## Status and limitations
 
-RC2 replaces RC1's WinUI settings application after its installed window failed to start in CI. The engine and configuration contract are unchanged by the UI framework replacement. Microsoft's code-based WPF ThemeMode API is experimental; it is limited to the appearance layer, with a logged fallback. Interactive testing of real gesture actions, multi-monitor/DPI behavior, elevation boundaries, and Lua compatibility is still required before a stable release. Localization, signed binaries and an update service remain future work.
+RC2 replaced RC1's WinUI settings application after its installed window failed to start in CI. RC3 adds version-aware Windows 10 compatibility without changing the gesture/configuration contract. The engine and configuration contract are unchanged by the UI framework replacement. Microsoft's code-based WPF ThemeMode API is experimental; it is limited to the appearance layer, with a logged fallback. Interactive testing of real gesture actions, multi-monitor/DPI behavior, elevation boundaries, and Lua compatibility is still required before a stable release. Localization, signed binaries and an update service remain future work.
 
 Workspace: %LOCALAPPDATA%\Nyxic-Lab\Gestures. Startup errors are logged to ui-status.log. The legacy WGestures files are not overwritten. Failed activation attempts to restore the previous active files; it does not silently restart an old engine.
