@@ -122,6 +122,33 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
             if ($validation.ExitCode -ne 0) { throw 'Installed engine validation failed.' }
             Write-Host 'PASS installed engine validates real configuration'
 
+            if ([Environment]::UserInteractive) {
+                $hookTest = Start-Process $installedEngine -ArgumentList '--smoke-hooks' -PassThru
+                if (-not $hookTest.WaitForExit(20000)) {
+                    Stop-Process -Id $hookTest.Id -Force
+                    throw 'Native hook lifecycle smoke test timed out.'
+                }
+                if ($hookTest.ExitCode -ne 0) {
+                    $log = Join-Path $env:LOCALAPPDATA 'Nyxic-Lab\Gestures\engine-status.log'
+                    if (Test-Path $log) { Get-Content $log }
+                    throw "Native hook lifecycle smoke test failed: $($hookTest.ExitCode)"
+                }
+                Write-Host 'PASS native hook startup and shutdown (no active actions)'
+                $ui = Start-Process (Join-Path $testDir 'WGestures.Modern.exe') -PassThru
+                try {
+                    Start-Sleep -Seconds 5
+                    if ($ui.HasExited) { throw "WinUI launch failed: $($ui.ExitCode)" }
+                    if (-not $ui.CloseMainWindow()) { throw 'WinUI main window was not found.' }
+                    if (-not $ui.WaitForExit(10000)) { throw 'WinUI did not exit after closing its window.' }
+                    Write-Host 'PASS WinUI launch and close'
+                }
+                finally {
+                    if (-not $ui.HasExited) { Stop-Process -Id $ui.Id -Force }
+                }
+            } else {
+                Write-Host 'SKIP native hook and window launch: runner has no interactive desktop'
+            }
+
             $uninstall = Get-ChildItem $testDir -Filter 'unins*.exe' | Select-Object -First 1
             if (-not $uninstall) { throw 'Uninstaller was not created.' }
             $process = Start-Process -FilePath $uninstall.FullName -ArgumentList @(
@@ -130,7 +157,7 @@ Corresponding source: https://github.com/Nyxic-Lab/WGestures/tree/$commit
             if (Test-Path (Join-Path $testDir 'WGestures.Modern.exe')) {
                 throw 'Application executable remains after uninstall.'
             }
-            Write-Host 'PASS installer and uninstaller smoke test (file validation; no GUI launch)'
+            Write-Host 'PASS installer and uninstaller smoke test'
         }
         finally {
             if (Test-Path $testDir) { Remove-Item $testDir -Recurse -Force }
