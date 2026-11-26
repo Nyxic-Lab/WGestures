@@ -19,12 +19,14 @@ public sealed record EngineSettings
     public int StayMilliseconds { get; init; } = 500;
     public bool WindowsKeyGestures { get; init; }
     public bool AllowScripts { get; init; }
+    public string Theme { get; init; } = "System";
 
     public static string DataDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Nyxic-Lab", "Gestures");
     public static string DraftPath => Path.Combine(DataDirectory, "workspace.wg2");
     public static string ActivePath => Path.Combine(DataDirectory, "active.wg2");
     public static string SettingsPath => Path.Combine(DataDirectory, "engine.json");
+    public static string PreferencesPath => Path.Combine(DataDirectory, "preferences.json");
     public static string StatusPath => Path.Combine(DataDirectory, "engine-status.log");
     public const string ReadyEvent = @"Local\Nyxic.Gestures.Engine.Ready.v1";
     public const string StopEvent = @"Local\Nyxic.Gestures.Engine.Stop.v1";
@@ -42,6 +44,7 @@ public sealed record EngineSettings
 
     public void Validate()
     {
+        if (Theme is not ("System" or "Light" or "Dark")) throw new InvalidDataException("Unknown theme.");
         if (TriggerButtons < 1 || TriggerButtons > 15 ||
             InitialStayMilliseconds is < 50 or > 3000 || StayMilliseconds is < 50 or > 10000)
             throw new InvalidDataException("Invalid engine input settings.");
