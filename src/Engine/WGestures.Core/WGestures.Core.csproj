@@ -13,19 +13,19 @@
     <Compile Include="../../../WGestures.Core/Commands/IGestureContextAware.cs" Link="Commands/IGestureContextAware.cs" />
     <Compile Include="../../../WGestures.Core/Commands/IGestureModifiersAware.cs" Link="Commands/IGestureModifiersAware.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/ChangeAudioVolumeCommand.cs" Link="Commands/Impl/ChangeAudioVolumeCommand.cs" />
-    <Compile Include="../../../WGestures.Core/Commands/Impl/CmdCommand.cs" Link="Commands/Impl/CmdCommand.cs" />
+    <Compile Include="ModernCommands/CmdCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/DoNothingCommand.cs" Link="Commands/Impl/DoNothingCommand.cs" />
-    <Compile Include="../../../WGestures.Core/Commands/Impl/GotoUrlCommand.cs" Link="Commands/Impl/GotoUrlCommand.cs" />
+    <Compile Include="ModernCommands/GotoUrlCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/HotKeyCommand.cs" Link="Commands/Impl/HotKeyCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/OpenFileCommand.cs" Link="Commands/Impl/OpenFileCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/PauseWGesturesCommand.cs" Link="Commands/Impl/PauseWGesturesCommand.cs" />
-    <Compile Include="../../../WGestures.Core/Commands/Impl/ScriptCommand.cs" Link="Commands/Impl/ScriptCommand.cs" />
+    <Compile Include="ModernCommands/ScriptCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/SearchBox.cs" Link="Commands/Impl/SearchBox.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/SearchBox.Designer.cs" Link="Commands/Impl/SearchBox.Designer.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/SendTextCommand.cs" Link="Commands/Impl/SendTextCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/Sim.cs" Link="Commands/Impl/Sim.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/TaskSwitcherCommand.cs" Link="Commands/Impl/TaskSwitcherCommand.cs" />
-    <Compile Include="../../../WGestures.Core/Commands/Impl/WebSearchCommand.cs" Link="Commands/Impl/WebSearchCommand.cs" />
+    <Compile Include="ModernCommands/WebSearchCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/Impl/WindowControlCommand.cs" Link="Commands/Impl/WindowControlCommand.cs" />
     <Compile Include="../../../WGestures.Core/Commands/INeedInit.cs" Link="Commands/INeedInit.cs" />
     <Compile Include="../../../WGestures.Core/GestureButton.cs" Link="GestureButton.cs" />
