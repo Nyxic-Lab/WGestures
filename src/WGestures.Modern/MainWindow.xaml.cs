@@ -109,7 +109,7 @@ public sealed partial class MainWindow : Window
     private Button Action(string label, Action action, bool primary = false)
     {
         var button = new Button { Content = label, MinHeight = 36 };
-        if (primary) button.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
+        if (primary) button.Style = (Style)Root.Resources["PrimaryAction"];
         button.Click += (_, _) => action();
         return button;
     }
