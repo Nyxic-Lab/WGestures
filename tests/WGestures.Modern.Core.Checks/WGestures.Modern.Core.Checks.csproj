@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/WGestures.Modern.Core/WGestures.Modern.Core.csproj" />
+    <None Include="../../WGestures.App/defaults/config.plist" Link="config.plist" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../WGestures.App/defaults/gestures.wg2" Link="gestures.wg2" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
