@@ -16,6 +16,8 @@ public sealed record GestureRow(string ProfileKey, int Index, string Name, int T
         0 => "None", 1 => "Wheel forward", 2 => "Wheel backward", 4 => "Middle click",
         8 => "Left click", 16 => "Right click", 32 => "X1", 64 => "X2", _ => $"Modifier {Modifier}"
     };
+    public string DisplayCommand => CommandCatalog.Find(Command)?.Label ?? Command;
+    public string DetailLabel => TriggerLabel + " button" + (Modifier == 0 ? "" : "  ·  " + ModifierLabel) + "  ·  " + DisplayCommand;
     public string Summary => $"{TriggerLabel}  ·  {(Path.Length == 0 ? "—" : Path)}  ·  {Command}";
 }
 

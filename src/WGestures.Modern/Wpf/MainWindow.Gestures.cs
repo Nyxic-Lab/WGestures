@@ -17,7 +17,7 @@ namespace WGestures.Modern;
 internal sealed partial class MainWindow
 {
     private sealed record Option(int Value, string Label);
-    private static readonly Option[] Triggers =
+    private static readonly Option[] TriggerOptions =
     {
         new(1,"Right button"), new(2,"Middle button"), new(4,"X1"), new(8,"X2")
     };
@@ -41,20 +41,61 @@ internal sealed partial class MainWindow
     private static int ReadOption(ComboBox box) => box.SelectedValue is int value
         ? value : throw new ArgumentException("Choose a valid option.");
 
-    private static DataGrid GridForRows(params (string Header, string Path, double Weight)[] columns)
+    private static ListBox GestureList()
     {
-        var grid = new DataGrid
+        var list = new ListBox
         {
-            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false,
-            CanUserDeleteRows = false, SelectionMode = DataGridSelectionMode.Single,
-            SelectionUnit = DataGridSelectionUnit.FullRow, HeadersVisibility = DataGridHeadersVisibility.Column,
-            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal, MinHeight = 200,
-            RowHeight = 42, ColumnHeaderHeight = 36, Height = 400
+            BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+            SelectionMode = SelectionMode.Single, MinHeight = 220, Height = 420,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch
         };
-        foreach (var col in columns)
-            grid.Columns.Add(new DataGridTextColumn { Header = col.Header, Binding = new Binding(col.Path),
-                Width = new DataGridLength(col.Weight, DataGridLengthUnitType.Star), MinWidth = 52 });
-        return grid;
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        ScrollViewer.SetVerticalScrollBarVisibility(list, ScrollBarVisibility.Auto);
+        VirtualizingPanel.SetIsVirtualizing(list, true);
+        VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling);
+
+        var row = new FrameworkElementFactory(typeof(DockPanel));
+        row.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 3, 4, 3));
+        var tile = new FrameworkElementFactory(typeof(Border));
+        tile.SetValue(DockPanel.DockProperty, Dock.Left);
+        tile.SetValue(FrameworkElement.WidthProperty, 78.0);
+        tile.SetValue(FrameworkElement.HeightProperty, 58.0);
+        tile.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 13, 0));
+        tile.SetValue(Border.CornerRadiusProperty, new CornerRadius(9));
+        tile.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        var preview = new FrameworkElementFactory(typeof(GesturePathPreview));
+        preview.SetBinding(GesturePathPreview.PathTextProperty, new Binding(nameof(GestureRow.Path)));
+        preview.SetResourceReference(GesturePathPreview.StrokeProperty, "AccentBrush");
+        tile.AppendChild(preview); row.AppendChild(tile);
+        var path = new FrameworkElementFactory(typeof(TextBlock));
+        path.SetValue(DockPanel.DockProperty, Dock.Right);
+        path.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        path.SetValue(FrameworkElement.MarginProperty, new Thickness(10, 0, 8, 0));
+        path.SetValue(TextBlock.FontSizeProperty, 16.0);
+        path.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        path.SetValue(FrameworkElement.MaxWidthProperty, 126.0);
+        path.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        path.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+        path.SetBinding(TextBlock.TextProperty, new Binding(nameof(GestureRow.Path)));
+        row.AppendChild(path);
+        var column = new FrameworkElementFactory(typeof(StackPanel));
+        column.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        var name = new FrameworkElementFactory(typeof(TextBlock));
+        name.SetBinding(TextBlock.TextProperty, new Binding(nameof(GestureRow.Name)));
+        name.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        name.SetValue(TextBlock.FontSizeProperty, 15.0);
+        name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        name.SetResourceReference(TextBlock.ForegroundProperty, "MainText");
+        column.AppendChild(name);
+        var detail = new FrameworkElementFactory(typeof(TextBlock));
+        detail.SetBinding(TextBlock.TextProperty, new Binding(nameof(GestureRow.DetailLabel)));
+        detail.SetValue(TextBlock.FontSizeProperty, 12.0);
+        detail.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 4, 0, 0));
+        detail.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        detail.SetResourceReference(TextBlock.ForegroundProperty, "MutedText");
+        column.AppendChild(detail); row.AppendChild(column);
+        list.ItemTemplate = new DataTemplate(typeof(GestureRow)) { VisualTree = row };
+        return list;
     }
 
     private void RenderGestures()
@@ -70,8 +111,7 @@ internal sealed partial class MainWindow
         _profile = (string)profileChoice.SelectedValue;
         var search = Input(_query);
         var resultCount = Text("", 12, muted: true);
-        var list = GridForRows(("Gesture", nameof(GestureRow.Name), 1.7),
-            ("Path", nameof(GestureRow.Path), .8), ("Button", nameof(GestureRow.TriggerLabel), .8), ("Action", nameof(GestureRow.Command), 1.0));
+        var list = GestureList();
         AutomationProperties.SetName(list, "Gesture library");
         void Refresh(int? select = null)
         {
@@ -102,9 +142,14 @@ internal sealed partial class MainWindow
             }),
             Button("Move up", () => { if (Selected() is { } row) { workspace.MoveGesture(row.ProfileKey, row.Index, -1); Changed(); Refresh(row.Index); } }),
             Button("Move down", () => { if (Selected() is { } row) { workspace.MoveGesture(row.ProfileKey, row.Index, 1); Changed(); Refresh(row.Index); } }));
-        Add(_page, Card("Gesture library", Field("Application profile", profileChoice),
-            Field("Search", search, "Search by name, direction, trigger or command."), toolbar, resultCount, list));
-        Add(_page, Card("Editing gestures", Text("Double-click a row to open its editor. Draw a path, select a mouse button and modifier, then configure the action. Save or apply changes from the bottom bar.", muted: true)));
+        var filters = new Grid();
+        filters.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        filters.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var scope = Field("Application profile", profileChoice); scope.Margin = new Thickness(0,0,8,0);
+        var query = Field("Search gestures", search); query.Margin = new Thickness(8,0,0,0);
+        Grid.SetColumn(query, 1); filters.Children.Add(scope); filters.Children.Add(query);
+        Add(_page, Card("Gesture library", filters, toolbar, resultCount, list,
+            Text("Double-click a gesture to edit its path and action.", 12, muted: true)));
         Refresh();
     }
 
@@ -115,7 +160,7 @@ internal sealed partial class MainWindow
     {
         var body = new StackPanel();
         var name = Input(row?.Name ?? "", max: 120);
-        var trigger = OptionBox(Triggers, row?.Trigger ?? 1);
+        var trigger = OptionBox(TriggerOptions, row?.Trigger ?? 1);
         var modifier = OptionBox(Modifiers, row?.Modifier ?? 0);
         var execute = Check("Execute immediately when modifier is triggered",
             row is not null && _workspace!.GetExecuteOnModifier(row.ProfileKey, row.Index));
@@ -125,6 +170,12 @@ internal sealed partial class MainWindow
         Add(body, Field("Modifier", modifier));
         Add(body, execute);
         Add(body, Field("Directions", path, "Draw in the pad below, or add arrows manually."));
+        var preview = new GesturePathPreview { Height = 96 };
+        preview.SetBinding(GesturePathPreview.PathTextProperty, new Binding(nameof(TextBox.Text)) { Source = path });
+        preview.SetResourceReference(GesturePathPreview.StrokeProperty, "AccentBrush");
+        var tile = new Border { Child = preview, CornerRadius = new CornerRadius(10), Padding = new Thickness(8) };
+        tile.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        Add(body, tile);
         var keys = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
         foreach (var arrow in new[] { "↖", "↑", "↗", "←", "⌫", "→", "↙", "↓", "↘" })
         {
