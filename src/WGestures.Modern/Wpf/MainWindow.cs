@@ -193,7 +193,7 @@ internal sealed partial class MainWindow : Window
         var brand = Stack(Text("Nyxic Gestures", 22, true), Text("WINDOWS GESTURE MANAGER", 10, muted: true));
         brand.Margin = new Thickness(10, 6, 0, 26);
         DockPanel.SetDock(brand, Dock.Top); side.Children.Add(brand);
-        var version = Text("0.1.0  ·  Release candidate", 11, muted: true);
+        var version = Text("0.1.0-rc.3  ·  Release candidate", 11, muted: true);
         version.Margin = new Thickness(10, 10, 0, 4);
         DockPanel.SetDock(version, Dock.Bottom); side.Children.Add(version);
         _nav.BorderThickness = new Thickness(0);
@@ -388,8 +388,10 @@ internal sealed partial class MainWindow : Window
 
     private void RenderAbout()
     {
-        Add(_page, Card("Nyxic Gestures", Text("0.1.0 Release candidate", 22, true),
+        Add(_page, Card("Nyxic Gestures", Text("0.1.0-rc.3 Release candidate", 22, true),
             Text("Modern .NET 10 + WPF settings application with an independent native gesture engine."),
+            Text($"Windows build: {Theme.Profile.WindowsVersion} · UI mode: {Theme.CurrentMode}"),
+            Text("Windows 10 compatibility is selected automatically. Minimum target: version 1607 (build 14393)."),
             Text("Based on WGestures by YingDev, GPL-2.0. No account or telemetry is required."),
             Actions(Button("Project source", () => Process.Start(new ProcessStartInfo("https://github.com/Nyxic-Lab/WGestures") { UseShellExecute = true })?.Dispose()),
                 Button("Original project", () => Process.Start(new ProcessStartInfo("https://github.com/yingDev/WGestures") { UseShellExecute = true })?.Dispose()),
