@@ -27,6 +27,8 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         _ready = true;
+        try { _settings = EngineSettings.Read(EngineSettings.PreferencesPath); ApplyTheme(); }
+        catch (Exception ex) { Notify("Could not load preferences", ex.Message, InfoBarSeverity.Error); }
         try
         {
             var path = File.Exists(_draftPath) ? _draftPath : BundledPath;
@@ -62,10 +64,10 @@ public sealed partial class MainWindow : Window
         PageHost.Children.Clear();
         (PageTitle.Text, PageDescription.Text) = _page switch
         {
-            "gestures" => ("Gestures", "Find and edit the gestures in your configuration draft."),
-            "apps" => ("Applications", "Inspect application-specific profiles and global inheritance."),
-            "corners" => ("Corners & edges", "Inspect the eight screen corner and edge command slots."),
-            "settings" => ("Preferences", "Personalize the settings interface."),
+            "gestures" => ("Gestures", "Create, edit and organize mouse gestures."),
+            "apps" => ("Applications", "Manage application profiles and inherited gestures."),
+            "corners" => ("Corners & edges", "Assign actions to screen corners and edges."),
+            "settings" => ("Preferences", "Configure input behavior, gesture feedback and appearance."),
             "about" => ("About", "A community-maintained continuation of the original WGestures."),
             _ => ("Overview", "Make everyday Windows interactions a little faster.")
         };
@@ -155,6 +157,7 @@ public sealed partial class MainWindow : Window
         try
         {
             _workspace.SaveDraft(_draftPath);
+            _settings.Save(EngineSettings.PreferencesPath);
             _source = _draftPath;
             _dirty = false;
             UpdateSource();
@@ -163,8 +166,11 @@ public sealed partial class MainWindow : Window
         catch (Exception e) { Notify("Save failed", e.Message, InfoBarSeverity.Error); }
     }
 
-    private void UpdateSource() =>
-        SourceText.Text = (_dirty ? "Unsaved changes · " : "Source · ") + _source;
+    private void UpdateSource()
+    {
+        SourceText.Text = (_dirty ? "Unsaved edits · " : "Workspace · ") + _source;
+        EngineStatus.Text = EngineReady() ? "Engine running" : EngineRunning() ? "Engine starting / stopping" : "Engine stopped";
+    }
 
     private void Notify(string title, string message, InfoBarSeverity severity)
     {
@@ -184,6 +190,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private Button ExportButton() => AsyncAction("Export configuration…", async () =>
+    {
+        if (_workspace is null) return;
+        var picker = new FileSavePicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+        picker.FileTypeChoices.Add("WGestures configuration", new List<string> { ".wg2" });
+        picker.SuggestedFileName = "Nyxic-gestures";
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+        if (string.Equals(file.Path, EngineSettings.ActivePath, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Use Apply & start to change the active configuration.");
+        _workspace.Export(file.Path);
+        Notify("Configuration exported", file.Path, InfoBarSeverity.Success);
+    });
+
     private void RenderOverview()
     {
         var profiles = _workspace!.Profiles;
@@ -202,39 +223,30 @@ public sealed partial class MainWindow : Window
             metrics.Children.Add(cards[i]);
         }
         PageHost.Children.Add(metrics);
-        var info = new InfoBar
-        {
-            IsOpen = true, IsClosable = false, Severity = InfoBarSeverity.Informational,
-            Title = "Independent configuration workspace",
-            Message = "The current mouse hook and command engine have not been migrated. Changes here are saved only as a draft."
-        };
-        PageHost.Children.Add(info);
+        PageHost.Children.Add(EngineCard());
         PageHost.Children.Add(Card(Heading("Your gestures"), Paragraph("Browse global gestures and per-application assignments."),
             Action("Open gesture library", () => Navigate("gestures"), true)));
-        PageHost.Children.Add(Card(Heading("Configuration"), Paragraph("Start from the bundled original defaults or load your own version-3 file."),
-            ImportButton(), Action("Save draft", SaveDraft)));
+        PageHost.Children.Add(Card(Heading("Configuration"), Paragraph("Import original WGestures version-3 files or export your configuration."),
+            ImportButton(), ExportButton(), Action("Save workspace", SaveDraft)));
     }
 
     private void RenderGestures()
     {
         var profiles = _workspace!.Profiles;
         var picker = new ComboBox { Header = "Profile", HorizontalAlignment = HorizontalAlignment.Stretch };
-        foreach (var p in profiles)
-            picker.Items.Add(new ComboBoxItem { Content = p.Name + $"  ({p.Gestures.Count})", Tag = p.Key });
+        foreach (var p in profiles) picker.Items.Add(new ComboBoxItem { Content = p.Name + $"  ({p.Gestures.Count})", Tag = p.Key });
         picker.SelectedIndex = Math.Max(0, profiles.ToList().FindIndex(p => p.Key == _profile));
+        _profile = profiles[picker.SelectedIndex].Key;
         var search = new TextBox { Header = "Search gestures", PlaceholderText = "Name, direction, action…", Text = _query };
-        var list = new ListView
-        {
-            ItemTemplate = (DataTemplate)Root.Resources["GestureRowTemplate"],
-            SelectionMode = ListViewSelectionMode.Single,
-            MinHeight = 180, MaxHeight = 440,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch
-        };
+        var list = new ListView { ItemTemplate = (DataTemplate)Root.Resources["GestureRowTemplate"],
+            SelectionMode = ListViewSelectionMode.Single, MinHeight = 180, MaxHeight = 440,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch };
         AutomationProperties.SetName(list, "Gesture library");
         var results = Paragraph("");
         var editor = new StackPanel { Spacing = 12 };
         var editorCard = Card(Heading("Gesture details"), editor);
-        var listCard = Card(picker, search, results, list);
+        var add = Action("New gesture", () => { list.SelectedItem = null; ShowGestureEditor(editor, null, Refresh); }, true);
+        var listCard = Card(picker, search, add, results, list);
         var columns = new Grid { ColumnSpacing = 14, RowSpacing = 14 };
         columns.Children.Add(listCard);
         columns.Children.Add(editorCard);
@@ -244,146 +256,166 @@ public sealed partial class MainWindow : Window
             columns.RowDefinitions.Clear();
             if (width >= 750)
             {
-                columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
                 columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                Grid.SetColumn(editorCard, 1);
-                Grid.SetRow(editorCard, 0);
+                columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+                Grid.SetColumn(editorCard, 1); Grid.SetRow(editorCard, 0);
             }
             else
             {
                 columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                Grid.SetColumn(editorCard, 0);
-                Grid.SetRow(editorCard, 1);
+                Grid.SetColumn(editorCard, 0); Grid.SetRow(editorCard, 1);
             }
         }
         Layout(PageHost.ActualWidth - 56);
         columns.SizeChanged += (_, e) =>
         {
-            bool needsTwo = e.NewSize.Width >= 750;
-            if (needsTwo != (columns.ColumnDefinitions.Count == 2)) Layout(e.NewSize.Width);
+            if ((e.NewSize.Width >= 750) != (columns.ColumnDefinitions.Count == 2)) Layout(e.NewSize.Width);
         };
         PageHost.Children.Add(columns);
-        PageHost.Children.Add(Card(Heading("Draft storage"), ImportButton(), Action("Save draft", SaveDraft, true)));
+        PageHost.Children.Add(Card(Heading("Configuration"), Action("Save workspace", SaveDraft), ExportButton(),
+            AsyncAction("Apply & start / reload", ApplyAndStartAsync, true)));
 
-        void Refresh(int? selectIndex = null)
+        void Refresh(int? selectIndex)
         {
-            var rows = _workspace.Profiles.First(p => p.Key == _profile).Gestures
-                .Where(r => string.IsNullOrWhiteSpace(_query) ||
-                    (r.Name + " " + r.Summary + " " + r.ModifierLabel).Contains(_query, StringComparison.OrdinalIgnoreCase))
-                .ToArray();
+            var profile = _workspace!.Profiles.First(p => p.Key == _profile);
+            var rows = profile.Gestures.Where(r => string.IsNullOrWhiteSpace(_query) ||
+                (r.Name + " " + r.Summary + " " + r.ModifierLabel).Contains(_query, StringComparison.OrdinalIgnoreCase)).ToArray();
             list.ItemsSource = rows;
             results.Text = $"{rows.Length} matching gestures";
-            if (rows.Length > 0)
-                list.SelectedItem = rows.FirstOrDefault(r => r.Index == selectIndex) ?? rows[0];
-            else
-            {
-                editor.Children.Clear();
-                editor.Children.Add(Paragraph("No matching gestures."));
-            }
+            if (picker.SelectedItem is ComboBoxItem item) item.Content = profile.Name + $"  ({profile.Gestures.Count})";
+            if (rows.Length > 0) list.SelectedItem = rows.FirstOrDefault(r => r.Index == selectIndex) ?? rows[0];
+            else { editor.Children.Clear(); editor.Children.Add(Paragraph("No matching gestures. Select New gesture to add one.")); }
         }
-
         picker.SelectionChanged += (_, _) =>
         {
-            if (picker.SelectedItem is ComboBoxItem { Tag: string key }) { _profile = key; Refresh(); }
+            if (picker.SelectedItem is ComboBoxItem { Tag: string key }) { _profile = key; Refresh(null); }
         };
-        search.TextChanged += (_, _) => { _query = search.Text; Refresh(); };
+        search.TextChanged += (_, _) => { _query = search.Text; Refresh(null); };
         list.SelectionChanged += (_, _) =>
         {
-            editor.Children.Clear();
-            if (list.SelectedItem is not GestureRow row)
-            {
-                editor.Children.Add(Paragraph("Select a gesture to inspect or edit it."));
-                return;
-            }
-            editor.Children.Add(Heading(row.Name, 20));
-            editor.Children.Add(Paragraph($"Trigger: {row.TriggerLabel} · Modifier: {row.ModifierLabel}"));
-            editor.Children.Add(Paragraph($"Command: {row.Command}"));
-            var name = new TextBox { Header = "Gesture name", Text = row.Name, MaxLength = 120 };
-            var path = new TextBox { Header = "Directions", Text = row.Path, MaxLength = 32 };
-            editor.Children.Add(name);
-            editor.Children.Add(path);
-            var directionKeys = new Grid { ColumnSpacing = 5, RowSpacing = 5 };
-            for (int i = 0; i < 3; i++)
-            {
-                directionKeys.ColumnDefinitions.Add(new ColumnDefinition());
-                directionKeys.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            }
-            var keys = new[] { "↖", "↑", "↗", "←", "⌫", "→", "↙", "↓", "↘" };
-            for (int i = 0; i < keys.Length; i++)
-            {
-                string arrow = keys[i];
-                var key = Action(arrow, () =>
-                {
-                    if (arrow == "⌫")
-                    {
-                        if (path.Text.Length > 0) path.Text = path.Text[..^1];
-                    }
-                    else if (path.Text.Length < 32) path.Text += arrow;
-                });
-                key.HorizontalAlignment = HorizontalAlignment.Stretch;
-                AutomationProperties.SetName(key, arrow == "⌫" ? "Remove last direction" : $"Append {arrow}");
-                Grid.SetRow(key, i / 3);
-                Grid.SetColumn(key, i % 3);
-                directionKeys.Children.Add(key);
-            }
-            editor.Children.Add(directionKeys);
-            editor.Children.Add(Action("Apply edit to draft", () =>
-            {
-                try
-                {
-                    _workspace.EditGesture(row.ProfileKey, row.Index, name.Text, path.Text);
-                    _dirty = true;
-                    UpdateSource();
-                    Refresh(row.Index);
-                    Notify("Draft updated", "Select Save draft to keep this change.", InfoBarSeverity.Success);
-                }
-                catch (Exception e) { Notify("Invalid gesture", e.Message, InfoBarSeverity.Error); }
-            }, true));
-            editor.Children.Add(Paragraph("Trigger, modifiers and command parameters are preserved. Editing those fields is not implemented yet."));
+            if (list.SelectedItem is GestureRow row) ShowGestureEditor(editor, row, Refresh);
+            else { editor.Children.Clear(); editor.Children.Add(Paragraph("Select or create a gesture.")); }
         };
-        Refresh();
+        Refresh(null);
     }
 
     private void RenderApps()
     {
+        PageHost.Children.Add(AsyncAction("Add application…", async () =>
+        {
+            var picker = new FileOpenPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            picker.FileTypeFilter.Add(".exe");
+            var file = await picker.PickSingleFileAsync();
+            if (file is null) return;
+            var key = _workspace!.AddProfile(file.Path, Path.GetFileNameWithoutExtension(file.Name));
+            Changed(); _profile = key; Render();
+            Notify("Application added", file.Name, InfoBarSeverity.Success);
+        }, true));
         foreach (var profile in _workspace!.Profiles)
         {
             var key = profile.Key;
-            PageHost.Children.Add(Card(
-                Heading(profile.Name),
-                Paragraph(profile.ExecutablePath ?? "Shared default profile"),
-                Paragraph($"{profile.Gestures.Count} gestures · {(profile.Enabled ? "Enabled in source" : "Disabled in source")}" +
-                    (profile.InheritsGlobal ? " · Inherits global gestures" : "")),
-                Action("View gestures", () => { _profile = key; _query = ""; Navigate("gestures"); })));
+            var name = new TextBox { Header = "Profile name", Text = profile.Name, IsEnabled = key != GestureWorkspace.GlobalKey };
+            var enabled = new ToggleSwitch { Header = "Enable gestures for this profile", IsOn = profile.Enabled };
+            var inherits = new ToggleSwitch { Header = "Inherit global gestures", IsOn = profile.InheritsGlobal, IsEnabled = key != GestureWorkspace.GlobalKey };
+            var children = new List<UIElement> {
+                Heading(profile.Name), Paragraph(profile.ExecutablePath ?? "Shared default profile"),
+                Paragraph($"{profile.Gestures.Count} gestures"), name, enabled, inherits,
+                Action("Save profile", () => { try { _workspace.UpdateProfile(key, name.Text, enabled.IsOn, inherits.IsOn); Changed(); Render(); } catch (Exception e) { Notify("Invalid profile", e.Message, InfoBarSeverity.Error); } }),
+                Action("View gestures", () => { _profile = key; _query = ""; Navigate("gestures"); })
+            };
+            if (key != GestureWorkspace.GlobalKey)
+                children.Add(AsyncAction("Remove profile", async () =>
+                {
+                    if (!await ConfirmAsync("Remove application profile", $"Remove {profile.Name} and its custom gestures?", "Remove")) return;
+                    _workspace.DeleteProfile(key);
+                    if (_profile == key) _profile = GestureWorkspace.GlobalKey;
+                    Changed(); Render();
+                }));
+            PageHost.Children.Add(Card(children.ToArray()));
         }
     }
 
     private void RenderCorners()
     {
-        PageHost.Children.Add(Paragraph("Slots are shown in their original stored order. Command execution and editing are not connected."));
-        var rows = _workspace!.Corners;
-        foreach (var row in rows)
-            PageHost.Children.Add(Card(Heading(row.Name), Paragraph(row.Command)));
+        PageHost.Children.Add(Paragraph("Enable hot corners or rub edges in Preferences before activating their actions."));
+        var slots = new ComboBox { Header = "Screen location", HorizontalAlignment = HorizontalAlignment.Stretch };
+        foreach (var slot in _workspace!.Corners) slots.Items.Add(slot.Name + " · " + slot.Command);
+        var host = new StackPanel { Spacing = 10 };
+        void Edit()
+        {
+            host.Children.Clear();
+            int index = slots.SelectedIndex;
+            if (index < 0) return;
+            var editor = CreateCommandEditor(_workspace.GetCornerCommand(index));
+            host.Children.Add(editor.View);
+            host.Children.Add(Action("Save action", () =>
+            {
+                try
+                {
+                    _workspace.SetCornerCommand(index, editor.Read());
+                    Changed();
+                    Notify("Action saved", "Apply configuration to activate changes.", InfoBarSeverity.Success);
+                }
+                catch (Exception e) { Notify("Invalid corner action", e.Message, InfoBarSeverity.Error); }
+            }, true));
+        }
+        slots.SelectionChanged += (_, _) => Edit();
+        slots.SelectedIndex = 0;
+        PageHost.Children.Add(Card(slots, host));
+        PageHost.Children.Add(AsyncAction("Apply & start / reload", ApplyAndStartAsync, true));
     }
 
     private void RenderPreferences()
     {
         var theme = new ComboBox { Header = "Appearance", HorizontalAlignment = HorizontalAlignment.Stretch };
-        theme.Items.Add("System default");
-        theme.Items.Add("Light");
-        theme.Items.Add("Dark");
-        theme.SelectedIndex = Root.RequestedTheme switch { ElementTheme.Light => 1, ElementTheme.Dark => 2, _ => 0 };
+        foreach (var option in new[] { "System", "Light", "Dark" }) theme.Items.Add(option);
+        theme.SelectedItem = _settings.Theme;
         theme.SelectionChanged += (_, _) =>
-            Root.RequestedTheme = theme.SelectedIndex switch { 1 => ElementTheme.Light, 2 => ElementTheme.Dark, _ => ElementTheme.Default };
-        PageHost.Children.Add(Card(Heading("Personalization"), Paragraph("Choose the interface theme for this session."), theme));
-        PageHost.Children.Add(Card(Heading("Local configuration"), Paragraph(_draftPath), ImportButton(),
-            Action("Save draft", SaveDraft)));
+        {
+            if (theme.SelectedItem is string selection) { _settings = _settings with { Theme = selection }; ApplyTheme(); Changed(); }
+        };
+        ToggleSwitch Toggle(string label, bool value, Action<bool> set)
+        {
+            var toggle = new ToggleSwitch { Header = label, IsOn = value };
+            toggle.Toggled += (_, _) => { _settings = _settings with { }; set(toggle.IsOn); Changed(); };
+            return toggle;
+        }
+        var buttons = new StackPanel { Spacing = 6 };
+        foreach (var (bit, label) in new[] { (1, "Right button"), (2, "Middle button"), (4, "X1"), (8, "X2") })
+        {
+            var check = new CheckBox { Content = label, IsChecked = (_settings.TriggerButtons & bit) != 0 };
+            check.Checked += (_, _) => { _settings = _settings with { TriggerButtons = _settings.TriggerButtons | bit }; Changed(); };
+            check.Unchecked += (_, _) => { _settings = _settings with { TriggerButtons = _settings.TriggerButtons & ~bit }; Changed(); };
+            buttons.Children.Add(check);
+        }
+        var initialMs = new NumberBox { Header = "Initial stay timeout (ms)", Minimum = 50, Maximum = 3000, Value = _settings.InitialStayMilliseconds, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        initialMs.ValueChanged += (_, e) => { if (!double.IsNaN(e.NewValue)) { _settings = _settings with { InitialStayMilliseconds = (int)e.NewValue }; Changed(); } };
+        var stayMs = new NumberBox { Header = "Gesture stay timeout (ms)", Minimum = 50, Maximum = 10000, Value = _settings.StayMilliseconds, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        stayMs.ValueChanged += (_, e) => { if (!double.IsNaN(e.NewValue)) { _settings = _settings with { StayMilliseconds = (int)e.NewValue }; Changed(); } };
+        PageHost.Children.Add(Card(Heading("Appearance"), theme,
+            Toggle("Show gesture trail", _settings.ShowPath, v => _settings = _settings with { ShowPath = v }),
+            Toggle("Show action name", _settings.ShowCommandName, v => _settings = _settings with { ShowCommandName = v }),
+            Toggle("Fade out gesture trail", _settings.FadeOut, v => _settings = _settings with { FadeOut = v })));
+        PageHost.Children.Add(Card(Heading("Input"), Paragraph("Trigger buttons"), buttons,
+            Toggle("Eight directions", _settings.EightDirections, v => _settings = _settings with { EightDirections = v }),
+            Toggle("Disable in fullscreen", _settings.DisableFullscreen, v => _settings = _settings with { DisableFullscreen = v }),
+            Toggle("Target window under cursor", _settings.PreferCursorWindow, v => _settings = _settings with { PreferCursorWindow = v }),
+            Toggle("Enable Windows-key gestures", _settings.WindowsKeyGestures, v => _settings = _settings with { WindowsKeyGestures = v }),
+            Toggle("Initial stay timeout", _settings.InitialStayTimeout, v => _settings = _settings with { InitialStayTimeout = v }), initialMs,
+            Toggle("Stay timeout", _settings.StayTimeout, v => _settings = _settings with { StayTimeout = v }), stayMs));
+        PageHost.Children.Add(Card(Heading("Screen interactions"),
+            Toggle("Hot corners", _settings.HotCorners, v => _settings = _settings with { HotCorners = v }),
+            Toggle("Rub edges", _settings.RubEdges, v => _settings = _settings with { RubEdges = v })));
+        PageHost.Children.Add(Card(Heading("Script actions"), Paragraph("Only enable command-line and Lua actions for configurations you trust."),
+            Toggle("Allow command-line and Lua actions", _settings.AllowScripts, v => _settings = _settings with { AllowScripts = v })));
+        PageHost.Children.Add(Card(Heading("Save preferences"), Action("Save workspace", SaveDraft), AsyncAction("Apply & start / reload", ApplyAndStartAsync, true)));
     }
 
     private void RenderAbout()
     {
-        PageHost.Children.Add(Card(Heading("Nyxic Gestures", 24), Paragraph("Working name · Modern workspace preview"),
+        PageHost.Children.Add(Card(Heading("Nyxic Gestures", 24), Paragraph("Independent Windows gesture manager"),
             Paragraph("A continuation of WGestures by YingDev, under the original GPL-2.0 license."),
             Paragraph(".NET 10 · WinUI 3 · Windows App SDK 2.7.0"),
             new HyperlinkButton { Content = "Project source", NavigateUri = new Uri("https://github.com/Nyxic-Lab/WGestures") },
