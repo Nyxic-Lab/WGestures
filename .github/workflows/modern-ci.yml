@@ -1,0 +1,35 @@
+name: Modern Windows CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/WGestures.Modern*/**'
+      - 'tests/WGestures.Modern.Core.Checks/**'
+      - 'WGestures.App/defaults/gestures.wg2'
+      - '.github/workflows/modern-ci.yml'
+  push:
+    branches: [feat/modern-settings-shell]
+    paths:
+      - 'src/WGestures.Modern*/**'
+      - 'tests/WGestures.Modern.Core.Checks/**'
+      - 'WGestures.App/defaults/gestures.wg2'
+      - '.github/workflows/modern-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: microsoft/setup-msbuild@v2
+      - name: Run configuration regression checks
+        run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj --configuration Release
+      - name: Compile native settings application
+        run: msbuild src/WGestures.Modern/WGestures.Modern.csproj /restore /p:Configuration=Release /p:Platform=x64 /m
