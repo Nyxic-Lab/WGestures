@@ -43,6 +43,8 @@ jobs:
         run: dotnet build src/Engine/Nyxic.Gestures.Engine/Nyxic.Gestures.Engine.csproj -c Release -p:Platform=x64
       - name: Check configuration contract
         run: dotnet run --project tests/WGestures.Modern.Core.Checks/WGestures.Modern.Core.Checks.csproj -c Release
+      - name: Replay engine behavior with synthetic input
+        run: dotnet run --project tests/WGestures.Engine.Checks/WGestures.Engine.Checks.csproj -c Release
       - name: Validate bundled actions without activating hooks
         shell: pwsh
         run: |

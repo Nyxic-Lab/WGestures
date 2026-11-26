@@ -96,6 +96,8 @@ namespace WGestures.Core
         private int _pointCount = 0;
         private GestureIntent _effectiveIntent;
         private IGestureModifiersAware _activeModifierCommand;
+        private bool _pathActive;
+        private bool _modifierFailed;
         private ExeApp _currentApp;
 
         private bool _isPaused;
@@ -260,7 +262,7 @@ namespace WGestures.Core
         //Stopwatch sw = new Stopwatch();
         private void PathTrackerOnEffectivePathGrow(PathEventArgs args)
         {
-            if (_gesture.Count() >= MaxGestureSteps) return;
+            if (!_pathActive || _modifierFailed || _gesture.Count() >= MaxGestureSteps) return;
 
             var gestureChanged = Parse(args);
 
@@ -295,6 +297,8 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathEnd(PathEventArgs args)
         {
+            if (!_pathActive) return;
+            _pathActive = false;
             if (IsInCaptureMode)
             {
                 OnGestureCaptured(_gesture);
@@ -328,6 +332,8 @@ namespace WGestures.Core
         private void PathTrackerOnPathStart(PathEventArgs args)
         {
             EndModifierSession();
+            _pathActive = true;
+            _modifierFailed = false;
             //初始化
             _effectiveIntent = null;
             _pointCount = 1;
@@ -337,6 +343,7 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathModifier(PathEventArgs args)
         {
+            if (!_pathActive || _modifierFailed) return;
             Debug.WriteLineIf(_gesture.Modifier != args.Modifier,"Gesture:" + _gesture);
 
             _gesture.Modifier = args.Modifier;
@@ -356,6 +363,7 @@ namespace WGestures.Core
                     {
                         ReportFailure(_effectiveIntent.Name, ex);
                         EndModifierSession();
+                        _modifierFailed = true;
                         _effectiveIntent = null;
                     }
                     return;
@@ -395,7 +403,8 @@ namespace WGestures.Core
                         {
                             ReportFailure(_effectiveIntent.Name, ex);
                             EndModifierSession();
-                            _effectiveIntent = null;
+                            _modifierFailed = true;
+                        _effectiveIntent = null;
                         }
                     }
                     else
@@ -406,7 +415,7 @@ namespace WGestures.Core
                         //todo：在这里发布一个事件应该是合理的
                         var execution = ExecuteIntent(_effectiveIntent, args.Context);
                         if (IntentExecuted != null) IntentExecuted(_effectiveIntent, execution);
-                        if (!execution.IsOk) _effectiveIntent = null;
+                        if (!execution.IsOk) { _modifierFailed = true; _effectiveIntent = null; }
                     }
 
                 }
@@ -482,6 +491,7 @@ namespace WGestures.Core
 
         private void PathTrackerOnPathTimeout(PathEventArgs args)
         {
+            _pathActive = false;
             EndModifierSession();
             _effectiveIntent = null;
         }
