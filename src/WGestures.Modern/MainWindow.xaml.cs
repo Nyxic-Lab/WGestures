@@ -40,6 +40,11 @@ public sealed partial class MainWindow : Window
         }
         Nav.SelectedItem = Nav.MenuItems[0];
         Render();
+        var statusTimer = DispatcherQueue.CreateTimer();
+        statusTimer.Interval = TimeSpan.FromSeconds(1);
+        statusTimer.Tick += (_, _) => UpdateSource();
+        statusTimer.Start();
+        Closed += (_, _) => statusTimer.Stop();
     }
 
     private void OpenWorkspace(string path)
@@ -161,7 +166,7 @@ public sealed partial class MainWindow : Window
             _source = _draftPath;
             _dirty = false;
             UpdateSource();
-            Notify("Draft saved", "The legacy application and its configuration were not modified.", InfoBarSeverity.Success);
+            Notify("Workspace saved", "Apply the workspace to make the changes active. The original application is unchanged.", InfoBarSeverity.Success);
         }
         catch (Exception e) { Notify("Save failed", e.Message, InfoBarSeverity.Error); }
     }
@@ -379,7 +384,7 @@ public sealed partial class MainWindow : Window
         ToggleSwitch Toggle(string label, bool value, Action<bool> set)
         {
             var toggle = new ToggleSwitch { Header = label, IsOn = value };
-            toggle.Toggled += (_, _) => { _settings = _settings with { }; set(toggle.IsOn); Changed(); };
+            toggle.Toggled += (_, _) => { set(toggle.IsOn); Changed(); };
             return toggle;
         }
         var buttons = new StackPanel { Spacing = 6 };
