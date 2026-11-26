@@ -111,12 +111,23 @@ namespace WGestures.Core.Impl.Windows
         {
             if (_hookThread != null) throw new InvalidOperationException("钩子已经安装了");
 
+            var installed = new ManualResetEventSlim(false);
+            Exception installError = null;
             _hookThread = new Thread(() =>
             {
-                _install();
-                Debug.WriteLine("钩子安装成功");
-
-                _hookThreadNativeId = Native.GetCurrentThreadId();
+                try
+                {
+                    _install();
+                    _hookThreadNativeId = Native.GetCurrentThreadId();
+                }
+                catch (Exception ex)
+                {
+                    installError = ex;
+                    if (_hookId != IntPtr.Zero) Native.UnhookWindowsHookEx(_hookId);
+                    if (_kbdHookId != IntPtr.Zero) Native.UnhookWindowsHookEx(_kbdHookId);
+                    return;
+                }
+                finally { installed.Set(); }
 
                 try
                 {
@@ -141,10 +152,7 @@ namespace WGestures.Core.Impl.Windows
                                 break;
                                 
                             case (uint)User32.WM.WM_CLOSE:
-                                @continue = false;
-                                _uinstall();
-                                _hookThreadNativeId = 0;
-                                break;
+                                return;
                         }
 
                         if (GotMessage != null)
@@ -161,6 +169,8 @@ namespace WGestures.Core.Impl.Windows
                 {
                     if (_hookId != IntPtr.Zero) Native.UnhookWindowsHookEx(_hookId);
                     if (_kbdHookId != IntPtr.Zero) Native.UnhookWindowsHookEx(_kbdHookId);
+                    _hookId = _kbdHookId = IntPtr.Zero;
+                    _hookThreadNativeId = 0;
                 }
 
                 Debug.WriteLine("钩子线程结束");
@@ -173,6 +183,9 @@ namespace WGestures.Core.Impl.Windows
                 Name = "MouseHook钩子线程" };
 
             _hookThread.Start();
+            if (!installed.Wait(5000)) throw new TimeoutException("Timed out while installing input hooks.");
+            installed.Dispose();
+            if (installError != null) throw new InvalidOperationException("Failed to install input hooks.", installError);
         }
 
         public void Uninstall()
