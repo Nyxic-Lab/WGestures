@@ -127,4 +127,27 @@ Check(legacyPreferences.TriggerButtons == 15 && legacyPreferences.PauseKey == 87
     "legacy plist imports original trigger and pause shortcut");
 Check(!legacyPreferences.AutoStart && !legacyPreferences.AllowScripts,
     "legacy migration never enables startup or scripts without opt-in");
+var originalWin10 = WindowsCompatibility.ForVersion(new Version(10, 0, 10240));
+Check(!originalWin10.MeetsMinimum && !originalWin10.UseFluent && !originalWin10.UsePerMonitorV2,
+    "Windows 10 1507 is below the declared runtime minimum");
+var win1511 = WindowsCompatibility.ForVersion(new Version(10, 0, 10586));
+Check(!win1511.MeetsMinimum, "Windows 10 1511 remains outside the runtime target");
+var win1607 = WindowsCompatibility.ForVersion(new Version(10, 0, 14393));
+Check(win1607.MeetsMinimum && !win1607.UseFluent && !win1607.UsePerMonitorV2,
+    "Windows 10 1607 uses classic WPF and first-generation per-monitor DPI");
+var win1703 = WindowsCompatibility.ForVersion(new Version(10, 0, 15063));
+Check(win1703.MeetsMinimum && !win1703.UseFluent && win1703.UsePerMonitorV2,
+    "Windows 10 1703 enables per-monitor DPI v2");
+var win1809 = WindowsCompatibility.ForVersion(new Version(10, 0, 17763));
+Check(win1809.MeetsMinimum && !win1809.UseFluent && win1809.UsePerMonitorV2,
+    "Windows 10 1809 retains compatible WPF controls");
+var win22h2 = WindowsCompatibility.ForVersion(new Version(10, 0, 19045));
+Check(win22h2.MeetsMinimum && !win22h2.UseFluent && win22h2.UsePerMonitorV2,
+    "Windows 10 22H2 retains compatible WPF controls");
+var win11 = WindowsCompatibility.ForVersion(new Version(10, 0, 22000));
+Check(win11.MeetsMinimum && win11.UseFluent && win11.UsePerMonitorV2,
+    "Windows 11 retains Fluent WPF and DPI v2");
+var forced = WindowsCompatibility.ForVersion(new Version(10, 0, 26100), true);
+Check(forced.MeetsMinimum && !forced.UseFluent && !forced.UsePerMonitorV2,
+    "forced compatibility exercises classic WPF and first-generation DPI on modern Windows");
 Console.WriteLine($"{checks} checks passed.");
