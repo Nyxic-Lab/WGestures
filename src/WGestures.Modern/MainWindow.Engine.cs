@@ -117,6 +117,7 @@ public sealed partial class MainWindow
             _workspace.SaveDraft(_draftPath);
             _settings.Save(EngineSettings.PreferencesPath);
             await RunEngineAsync();
+            SetAutoStart(_settings.AutoStart);
             _source = _draftPath;
             _dirty = false;
             Render();
@@ -190,6 +191,14 @@ public sealed partial class MainWindow
             Directory.CreateDirectory(EngineSettings.DataDirectory);
             Process.Start(new ProcessStartInfo(EngineSettings.DataDirectory) { UseShellExecute = true });
         }));
+
+    private void SetAutoStart(bool enabled)
+    {
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+        if (enabled)
+            key.SetValue("NyxicGestures", "\"" + EngineExe + "\"", Microsoft.Win32.RegistryValueKind.String);
+        else key.DeleteValue("NyxicGestures", false);
+    }
 
     private void ApplyTheme() => Root.RequestedTheme = _settings.Theme switch
     {
