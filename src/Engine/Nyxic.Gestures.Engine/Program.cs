@@ -27,6 +27,22 @@ internal static class Program
     {
         try
         {
+            if (args is ["--stop"])
+            {
+                try
+                {
+                    using var signal = EventWaitHandle.OpenExisting(EngineSettings.StopEvent);
+                    signal.Set();
+                }
+                catch (WaitHandleCannotBeOpenedException) { }
+                for (int i = 0; i < 80; i++)
+                {
+                    try { using var running = Mutex.OpenExisting(EngineSettings.EngineMutex); }
+                    catch (WaitHandleCannotBeOpenedException) { return 0; }
+                    Thread.Sleep(125);
+                }
+                return 3;
+            }
             if (args is ["--validate", var path, var settingsPath])
             {
                 _ = new WorkspaceIntentStore(GestureWorkspace.Open(path), EngineSettings.Read(settingsPath));
