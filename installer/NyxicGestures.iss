@@ -76,3 +76,9 @@ begin
   if not Result then
     MsgBox('Please exit Nyxic Gestures from its system tray before uninstalling.', mbError, MB_OK);
 end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+    RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'NyxicGestures');
+end;
