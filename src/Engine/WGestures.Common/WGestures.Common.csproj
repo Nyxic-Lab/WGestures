@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>WGestures.Common</AssemblyName>
+    <RootNamespace>WGestures.Common</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../WGestures.Common/Annotation/NamedAttribute.cs" Link="Annotation/NamedAttribute.cs" />
+    <Compile Include="../../../WGestures.Common/Config/AbstractDictConfig.cs" Link="Config/AbstractDictConfig.cs" />
+    <Compile Include="../../../WGestures.Common/Config/IConfig.cs" Link="Config/IConfig.cs" />
+    <Compile Include="../../../WGestures.Common/Config/Plist.cs" Link="Config/Plist.cs" />
+    <Compile Include="../../../WGestures.Common/Config/Impl/PlistConfig.cs" Link="Config/Impl/PlistConfig.cs" />
+    <Compile Include="../../../WGestures.Common/DetailedDebugListener.cs" Link="DetailedDebugListener.cs" />
+    <Compile Include="../../../WGestures.Common/NumberUtil.cs" Link="NumberUtil.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/CanvasForm.cs" Link="OsSpecific/Windows/CanvasForm.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/CanvasWindow.cs" Link="OsSpecific/Windows/CanvasWindow.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/ClipboardMonitor.cs" Link="OsSpecific/Windows/ClipboardMonitor.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/DiBitmap.cs" Link="OsSpecific/Windows/DiBitmap.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/GlobalHotKeyManager.cs" Link="OsSpecific/Windows/GlobalHotKeyManager.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/GlobalKeyboardHook.cs" Link="OsSpecific/Windows/GlobalKeyboardHook.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Native.cs" Link="OsSpecific/Windows/Native.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Screen.cs" Link="OsSpecific/Windows/Screen.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/TCDTouchInjection.cs" Link="OsSpecific/Windows/TCDTouchInjection.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Win32/GDI32.cs" Link="OsSpecific/Windows/Win32/GDI32.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Win32/Kernel32.cs" Link="OsSpecific/Windows/Win32/Kernel32.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Win32/Kernel32Desktop.cs" Link="OsSpecific/Windows/Win32/Kernel32Desktop.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Win32/Shell32.cs" Link="OsSpecific/Windows/Win32/Shell32.cs" />
+    <Compile Include="../../../WGestures.Common/OsSpecific/Windows/Win32/User32.cs" Link="OsSpecific/Windows/Win32/User32.cs" />
+    <Compile Include="../../../WGestures.Common/Product/VersionInfo.cs" Link="Product/VersionInfo.cs" />
+    <ProjectReference Include="../WindowsInput/WindowsInput.csproj" />
+
+  </ItemGroup>
+</Project>
