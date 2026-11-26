@@ -1,4 +1,4 @@
-# Windows compatibility — Nyxic Gestures RC3
+# Windows compatibility — Nyxic Gestures RC4
 
 The unified x64 package keeps the same .NET 10 engine, gesture format, installer identity and settings storage. There is no separate legacy fork and no Windows App SDK dependency.
 
@@ -28,10 +28,10 @@ $p.ExitCode
 
 Both exit codes must be zero. The UI log should identify the real Windows build and classic compatibility mode. The smoke-hook test uses an empty disabled configuration, and does not execute gesture actions. Check engine-status.log under %LOCALAPPDATA%\Nyxic-Lab\Gestures for the chosen DPI mode.
 
-Then manually check: normal UI startup, six settings pages, application profiles, drawing and editing gestures, saving and applying configuration, actual mouse gesture recognition, a harmless keyboard action, tray pause/resume/exit, resolution and mixed-DPI displays, upgrade and uninstall. Preserve logs and Windows build number when reporting issues. Windows 10 1607 is not yet verified on real hardware/VM in this PR.
+Then manually check: normal UI startup, six settings pages, application profiles, drawing and editing gestures, saving and applying configuration, actual mouse gesture recognition, a harmless keyboard action, tray pause/resume/exit, resolution and mixed-DPI displays, upgrade and uninstall. Preserve logs and Windows build number when reporting issues. Windows 10 1607 is not yet verified on real hardware/VM in this PR. RC3 hosted CI passed; RC4 shares the same UI design templates on both OS paths, with only the native theme path downgraded.
 
 ## Hosted CI
 
-The release script requires a real interactive Windows runner. It runs both native hook startup/shutdown paths and both WPF startup paths (normal and forced compatibility), along with the configuration tests, six pages, twelve action editors, theme modes, install/uninstall and package policy checks. These tests exercise the compatibility code on a modern OS; they do not emulate or certify Windows 10 1607.
+The release script requires a real interactive Windows runner. It runs both native hook startup/shutdown paths and both WPF startup paths (normal and forced compatibility), visual evidence and shared dropdown test, along with the configuration tests, six pages, twelve action editors, theme modes, install/uninstall and package policy checks. These tests exercise the compatibility code on a modern OS; they do not emulate or certify Windows 10 1607.
 
 For troubleshooting the UI on Windows 11, launch `WGestures.Modern.exe --compatibility`. This selects classic controls for that process; it does not modify the OS or stored gesture configuration.
