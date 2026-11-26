@@ -111,4 +111,20 @@ Check(true, "edited configuration validates for runtime");
 var settings = new EngineSettings { TriggerButtons = 0 };
 Reject(settings.Validate, "no active trigger buttons rejected");
 
+var stroke = new GestureStroke(0, 0, true);
+stroke.Move(0, -30);
+stroke.Move(0, -60);
+stroke.Move(30, -60);
+stroke.Move(60, -30);
+Check(stroke.Path == "↑→↘", "drawing pad captures distinct eight-way segments");
+var four = new GestureStroke(0, 0, false);
+four.Move(-30, 0);
+four.Move(-30, 40);
+Check(four.Path == "←↓", "four-direction drawing mode");
+var plist = Path.Combine(AppContext.BaseDirectory, "config.plist");
+var legacyPreferences = EngineSettings.ImportLegacyPlist(plist);
+Check(legacyPreferences.TriggerButtons == 15 && legacyPreferences.PauseKey == 87 && legacyPreferences.PauseModifiers == 7,
+    "legacy plist imports original trigger and pause shortcut");
+Check(!legacyPreferences.AutoStart && !legacyPreferences.AllowScripts,
+    "legacy migration never enables startup or scripts without opt-in");
 Console.WriteLine($"{checks} checks passed.");
