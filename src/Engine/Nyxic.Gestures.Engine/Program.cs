@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using WGestures.Core;
+using WGestures.Common.OsSpecific.Windows;
 using WGestures.Core.Impl.Windows;
 using WGestures.Core.Persistence.Impl.Windows;
 using WGestures.Modern.Core;
@@ -84,6 +85,7 @@ internal sealed class EngineContext : ApplicationContext
     private readonly NotifyIcon _tray;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly ToolStripMenuItem _pause;
+    private GlobalHotKeyManager? _hotkey;
     private bool _disposed;
 
     internal EngineContext(WorkspaceIntentStore store, EngineSettings settings, EventWaitHandle stop, EventWaitHandle ready)
@@ -109,7 +111,9 @@ internal sealed class EngineContext : ApplicationContext
         };
         _view = new CanvasWindowGestureView(_parser)
         {
-            ShowPath = settings.ShowPath, ShowCommandName = settings.ShowCommandName, ViewFadeOut = settings.FadeOut
+            ShowPath = settings.ShowPath, ShowCommandName = settings.ShowCommandName, ViewFadeOut = settings.FadeOut,
+            PathMainColor = Color.FromArgb(settings.RightTrailColor), PathMiddleBtnMainColor = Color.FromArgb(settings.MiddleTrailColor),
+            PathXBtnMainColor = Color.FromArgb(settings.XTrailColor), PathAlternativeColor = Color.FromArgb(settings.UnrecognizedTrailColor)
         };
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open settings", null, (_, _) => OpenSettings());
@@ -118,6 +122,17 @@ internal sealed class EngineContext : ApplicationContext
         menu.Items.Add("Exit", null, (_, _) => ExitThread());
         _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "Nyxic Gestures", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => OpenSettings();
+        if (settings.PauseKey != 0)
+        {
+            try
+            {
+                _hotkey = new GlobalHotKeyManager();
+                if (!_hotkey.RegisterHotKey("PauseResume", (GlobalHotKeyManager.ModifierKeys)settings.PauseModifiers,
+                    (Keys)settings.PauseKey, _ => _parser.TogglePause()))
+                    Program.Log("Pause shortcut could not be registered (already in use).");
+            }
+            catch (Exception ex) { Program.Log("Pause shortcut: " + ex.Message); }
+        }
         _tracker.RequestPauseResume += _ => _parser.TogglePause();
         _tracker.HookReady += () => { _ready.Set(); Program.Log("Input hooks installed."); };
         _worker = new Thread(() =>
@@ -164,6 +179,7 @@ internal sealed class EngineContext : ApplicationContext
                 }
             }
             catch (Exception ex) { Program.Log(ex.ToString()); }
+            _hotkey?.Dispose();
             _tray.Dispose();
             _timer.Dispose();
             Program.Log("Engine stopped.");
