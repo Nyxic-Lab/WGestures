@@ -1,26 +1,29 @@
-# WGestures modernization
+# Nyxic Gestures modernization
 
-This fork is being modernized in a separate branch. The original `master` branch remains the reference baseline.
+Working product name: **Nyxic Gestures**. The original `master` branch remains the upstream reference until the new application is validated.
 
 ## Target architecture
 
-- **Runtime:** .NET 10 LTS (`net10.0-windows`).
-- **Desktop UI:** Windows App SDK / WinUI 3 with Fluent controls.
-- **Core:** C# class libraries decoupled from UI concerns, with the original gesture engine ported and characterized through tests before replacement.
-- **Input:** Windows native hooks and input injection behind explicit interfaces; do not put input hooks in the UI process long-term.
-- **Storage:** local, versioned configuration with migration from the existing format; no required account, remote service, or telemetry.
-- **Distribution:** unpackaged desktop build first, then signed installers or MSIX as appropriate; do not reuse upstream signing certificates or update endpoints.
+- **Runtime:** .NET 10 LTS.
+- **Desktop UI:** Windows App SDK 2.7.0 / WinUI 3, Fluent controls, light/dark/system theme.
+- **Configuration:** standalone `WGestures.Modern.Core` library, System.Text.Json, original version-3 documents with opaque command payloads and a separate draft path. No required account, remote service, or telemetry.
+- **Input:** port native hooks, gesture recognition and command execution behind explicit interfaces. Evaluate a lightweight separate engine process and a local IPC contract before adding complexity.
+- **Distribution:** unpackaged desktop build first, then signed installers or MSIX as appropriate. Do not reuse upstream signing certificates or update endpoints.
 
-## Current legacy boundaries
+## Legacy boundaries
 
-`WGestures.App/Gui/Windows/SettingsForm.Designer.cs` (~115 KB) and `SettingsForm.cs` (~49 KB) are tightly coupled WinForms UI/controller code. The app and the supporting projects currently target .NET Framework; the app references legacy NLua, KeraLua and Newtonsoft.Json versions and invokes an upstream certificate-signing command as a post-build step.
+The legacy settings UI uses a ~115 KB WinForms designer and ~49 KB code-behind with data binding and event handlers. The original projects use .NET Framework 4.8, legacy NLua/KeraLua/Newtonsoft.Json and upstream post-build certificate signing. Keep this baseline unchanged while migrating.
 
-## Migration milestones
+## Implementation progress
 
-1. Introduce a compile-independent WinUI 3 settings shell in `src/WGestures.Modern` with navigation and an accessible light/dark theme. Keep the legacy build untouched.
-2. Extract reusable settings and gesture contracts into a modern .NET 10 class library. Add serialization tests and a configuration migration strategy.
-3. Port the Windows hook, gesture recognition and command execution subsystems; test pointer input, DPI, multi-display and error recovery.
-4. Wire the WinUI editor to the ported implementation and add end-to-end Windows smoke tests.
-5. Replace upstream branding/update/install integration and build a new release pipeline once modern runtime behavior is verified.
+- [x] Isolated modern settings shell with six navigation sections.
+- [x] Portable version-3 gesture-document reader, preserving raw JSON and never resolving imported CLR type metadata.
+- [x] Actual overview metrics, profile filtering, search, row inspection, gesture name/path edits, isolated draft storage and appearance selector.
+- [x] Core regression check program based on upstream defaults; Windows CI workflow added (execution status must be checked separately).
+- [ ] Validate the modern application on Windows and fix any build / launch issues.
+- [ ] Complete the settings editor: trigger/modifier, commands, new/delete/reorder, per-app settings, corner editor, localization, migration of config.plist.
+- [ ] Port the engine and Windows hook implementation, test DPI, multiple displays, input state and command semantics.
+- [ ] Wire the editor to the engine, verify migration and upgrade behavior, and replace upstream branding/update/install integration.
+- [ ] Produce an independently signed release after testing.
 
-Do not ship the new UI as if it controls gestures until its backend is connected. Changes to trigger semantics and action execution should have regression tests.
+The modern preview does not control the legacy gesture process. Do not describe it as a functional mouse gesture utility until integration is complete. Keep GPL-2.0 and upstream attribution intact.
