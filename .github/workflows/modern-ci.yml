@@ -8,6 +8,11 @@ on:
       - 'WGestures.App/defaults/gestures.wg2'
       - '.github/workflows/modern-ci.yml'
       - 'installer/**'
+      - 'src/Engine/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
   push:
     branches: [feat/modern-settings-shell]
     paths:
@@ -16,7 +21,16 @@ on:
       - 'WGestures.App/defaults/gestures.wg2'
       - '.github/workflows/modern-ci.yml'
       - 'installer/**'
+      - 'src/Engine/**'
+      - 'WGestures.Core/**'
+      - 'WGestures.Common/**'
+      - 'WGestures.View/**'
+      - 'WindowsInput/**'
   workflow_dispatch:
+
+concurrency:
+  group: modern-windows-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -45,16 +59,16 @@ jobs:
             choco install innosetup -y --no-progress
             if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
           }
-      - name: Package and smoke-test Windows preview
+      - name: Package and smoke-test Windows release candidate
         if: github.event_name != 'push'
         shell: pwsh
-        run: ./installer/Build-Preview.ps1
+        run: ./installer/Build-Release.ps1
       - name: Upload Windows installer
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: NyxicGestures-0.1.0-preview.1-win-x64-Setup
-          path: artifacts/preview/*-Setup.exe
+          name: NyxicGestures-0.1.0-rc.1-win-x64-Setup
+          path: artifacts/release/*-Setup.exe
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -62,10 +76,10 @@ jobs:
         if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: NyxicGestures-0.1.0-preview.1-portable-and-source
+          name: NyxicGestures-0.1.0-rc.1-portable-and-source
           path: |
-            artifacts/preview/*.zip
-            artifacts/preview/SHA256SUMS.txt
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
