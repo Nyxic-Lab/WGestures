@@ -5,7 +5,7 @@
   #error OutputDir must point to the installer output directory
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.1.0-rc.2"
+  #define AppVersion "0.1.0-rc.3"
 #endif
 
 [Setup]
@@ -20,7 +20,7 @@ DefaultGroupName=Nyxic Gestures
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
-MinVersion=10.0.19041
+MinVersion=10.0.14393
 OutputDir={#OutputDir}
 OutputBaseFilename=NyxicGestures-{#AppVersion}-win-x64-Setup
 Compression=lzma2
